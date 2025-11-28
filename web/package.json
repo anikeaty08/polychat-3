@@ -4,10 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm rebuild lightningcss && next build",
     "start": "next start",
-    "lint": "eslint",
-    "postinstall": "npm rebuild lightningcss"
+    "lint": "eslint"
   },
   "dependencies": {
     "@lighthouse-web3/sdk": "^0.4.3",
