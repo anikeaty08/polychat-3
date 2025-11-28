@@ -1,0 +1,51 @@
+# Root .gitignore for the PolyChat repository
+
+# Node modules (root and all subfolders)
+node_modules/
+**/node_modules/
+
+ 
+
+# Next.js build output (for `web` and any other Next apps)
+web/.next/
+.next/
+web/out/
+
+# Realtime server build / local env
+realtime-server/node_modules/
+realtime-server/.env
+realtime-server/dist/
+realtime-server/build/
+
+# Hardhat / Solidity build artifacts
+contracts/artifacts/
+contracts/cache/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Coverage, temporary and build files
+coverage/
+.parcel-cache/
+dist/
+build/
+
+# Lockfiles are usually committed — do NOT ignore package-lock.json or yarn.lock
+
+# Misc
+*.tgz
+*.log
+
+# Keep the web and realtime-server source tracked (do not ignore their directories themselves)
+
