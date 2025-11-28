@@ -1,20 +1,24 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
   turbopack: {
-    root: __dirname,
+    root: path.resolve(__dirname, ".."),
+    resolveAlias: {
+      pino: path.resolve(__dirname, "src/lib/empty.ts"),
+      "pino/file": path.resolve(__dirname, "src/lib/empty.ts"),
+      "thread-stream": path.resolve(__dirname, "src/lib/empty.ts"),
+    },
   },
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      // Replace pino with empty module in browser builds
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        "pino": false,
-        "pino/file": false,
-        "thread-stream": false,
-      };
-    }
+  webpack: (config) => {
+    config.resolve = config.resolve || {};
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      pino: path.resolve(__dirname, "src/lib/empty.ts"),
+      "pino/file": path.resolve(__dirname, "src/lib/empty.ts"),
+      "thread-stream": path.resolve(__dirname, "src/lib/empty.ts"),
+    };
     return config;
   },
 };

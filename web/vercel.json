@@ -1,9 +1,11 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "installCommand": "npm install --legacy-peer-deps --omit=optional",
   "env": {
-    "NODE_OPTIONS": "--max_old_space_size=4096",
-    "NEXT_BUILD_BUNDLER": "webpack"
-  }
+    "CSS_TRANSFORMER_WASM": "1"
+  },
+  "build": {
+    "env": {
+      "CSS_TRANSFORMER_WASM": "1"
+    }
+  },
+  "installCommand": "npm install"
 }

@@ -1,3 +1,4 @@
+"use client";
 import { cookieStorage, createStorage, http } from "wagmi";
 import { createConfig } from "wagmi";
 import { injected, walletConnect } from "wagmi/connectors";
@@ -14,7 +15,7 @@ const transports = rpcUrl
 export const wagmiConfig = createConfig({
   chains: [polygonAmoy],
   transports,
-  ssr: true,
+  ssr: false,
   storage: createStorage({
     storage: cookieStorage,
   }),
@@ -26,6 +27,3 @@ export const wagmiConfig = createConfig({
     }),
   ],
 });
-
-
-
