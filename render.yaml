@@ -2,9 +2,9 @@ services:
   - type: web
     name: polychat
     env: node
-    buildCommand: cd web && npm install && npm run build
-    startCommand: cd web && npm start
     plan: free
+    buildCommand: cd web && npm ci --legacy-peer-deps && npm run build
+    startCommand: cd web && npm start
     envVars:
       - key: NODE_ENV
         value: production
