@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
+  turbopack: {},
   webpack: (config, { isServer }) => {
     if (!isServer) {
       // Replace pino with empty module in browser builds
