@@ -8,7 +8,10 @@ import { useChatStore } from "../state/chat-store";
 import { getConversationId, hashMessageBody } from "../lib/conversation";
 import { uploadJsonToLighthouse, fetchLighthouseJson } from "../lib/lighthouse";
 import { CallPanel } from "./call-panel";
-import { Ban, CheckCheck } from "lucide-react";
+import { Ban, CheckCheck, Smile } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
 export function ChatWindow() {
   const { address } = useAccount();
@@ -30,6 +33,7 @@ export function ChatWindow() {
   const [input, setInput] = useState("");
   const [target, setTarget] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastReadConversationRef = useRef<string | undefined>(undefined);
   const { writeContractAsync } = useWriteContract();
@@ -394,6 +398,11 @@ export function ChatWindow() {
     }
   }
 
+  const onEmojiClick = (emojiData: any) => {
+    setInput(prev => prev + emojiData.emoji);
+    setShowEmojiPicker(false);
+  };
+
   if (!me) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-zinc-400">
@@ -535,11 +544,25 @@ export function ChatWindow() {
         <div ref={messagesEndRef} />
       </main>
 
-      <footer className="border-t border-zinc-800 px-5 py-3">
+      <footer className="border-t border-zinc-800 px-5 py-3 relative">
+        {showEmojiPicker && (
+          <div className="absolute bottom-16 right-5 z-50">
+            <EmojiPicker onEmojiClick={onEmojiClick} theme="dark" />
+          </div>
+        )}
         <form
           onSubmit={handleSend}
           className="flex items-center gap-2 rounded-2xl bg-zinc-900/80 px-3 py-2"
         >
+          <button
+            type="button"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            disabled={!activeConversation || !!isBlocked}
+            className="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Add emoji"
+          >
+            <Smile className="h-5 w-5" />
+          </button>
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -565,5 +588,3 @@ export function ChatWindow() {
     </section>
   );
 }
-
-
