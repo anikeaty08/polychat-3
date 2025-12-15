@@ -4,15 +4,18 @@ import { WalletConnectButton } from "../components/wallet-connect-button";
 import { ChatSidebar } from "../components/chat-sidebar";
 import { ChatWindow } from "../components/chat-window";
 import { ProfileSheet } from "../components/profile-sheet";
+import { SplashScreen } from "../components/splash-screen";
 import { useState, useEffect } from "react";
 import { useAccount, useReadContract } from "wagmi";
 import { polygonChatRegistryAbi, registryAddress } from "../lib/contracts";
 import { useChatStore } from "../state/chat-store";
 import { getConversationId } from "../lib/conversation";
 import { getSocket } from "../lib/socket";
+import { Lock } from "lucide-react";
 
 export default function Home() {
   const [profileOpen, setProfileOpen] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
   const { address, isConnected } = useAccount();
   const { setProfile, contacts, addContact, me, addMessage, updateContactUnread, updateContactLastMessage } = useChatStore();
   
@@ -339,11 +342,21 @@ export default function Home() {
   }
 
   // Show wallet connect screen if not connected
+  if (showSplash) {
+    return <SplashScreen onComplete={() => setShowSplash(false)} />;
+  }
+
   if (!isConnected || !address) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-black via-[#020617] to-black px-4 py-6">
         <div className="w-full max-w-md rounded-[32px] border border-zinc-800/80 bg-zinc-950/90 p-8 shadow-[0_0_80px_rgba(139,92,246,0.25)] backdrop-blur-xl text-center">
           <h1 className="text-2xl font-bold text-zinc-100 mb-2">Polygon Chat</h1>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Lock className="h-4 w-4 text-emerald-400" />
+            <p className="text-xs font-semibold text-emerald-300">
+              End-to-End Encrypted
+            </p>
+          </div>
           <p className="text-sm text-zinc-400 mb-6">
             Decentralized messaging on blockchain
           </p>
@@ -366,9 +379,12 @@ export default function Home() {
               <h1 className="text-sm font-semibold text-zinc-100">
                 Polygon Chat
               </h1>
-              <p className="text-[11px] text-zinc-500">
-                Decentralized messaging on blockchain
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <Lock className="h-3 w-3 text-emerald-400" />
+                <p className="text-[10px] text-emerald-300 font-medium">
+                  End-to-End Encrypted
+                </p>
+              </div>
             </div>
             <WalletConnectButton />
           </div>
