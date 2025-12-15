@@ -8,7 +8,7 @@ import { useChatStore } from "../state/chat-store";
 import { getConversationId, hashMessageBody } from "../lib/conversation";
 import { uploadJsonToLighthouse, fetchLighthouseJson } from "../lib/lighthouse";
 import { CallPanel } from "./call-panel";
-import { Ban, CheckCheck, Smile } from "lucide-react";
+import { Ban, CheckCheck, Smile, Search, Trash2 } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
@@ -29,11 +29,17 @@ export function ChatWindow() {
     setMe,
     updateContactUnread,
     updateContactLastMessage,
+    deleteMessage,
   } = useChatStore();
   const [input, setInput] = useState("");
   const [target, setTarget] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    messageId: string;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastReadConversationRef = useRef<string | undefined>(undefined);
   const { writeContractAsync } = useWriteContract();
@@ -164,16 +170,13 @@ export function ChatWindow() {
 
   useEffect(() => {
     if (!conversationId) return;
-    // Convert conversationId to string for Socket.io room names
     const convIdHex = String(conversationId);
     const socket = getSocket();
     
-    // Ensure socket is connected
     if (!socket.connected) {
       socket.connect();
     }
     
-    // Wait for connection before joining
     const handleConnect = () => {
       console.log("Socket connected, joining conversation:", convIdHex);
       socket.emit("join-conversation", convIdHex);
@@ -191,12 +194,10 @@ export function ChatWindow() {
         console.log("Message conversationId mismatch:", payload.conversationId, "expected:", convIdHex);
         return;
       }
-      // Only add if message is from the other person (not from me)
       if (payload.from && payload.from.toLowerCase() !== me?.toLowerCase()) {
         console.log("Adding message from other user:", payload.from);
         addMessage(convIdHex, payload);
         
-        // Update contact's last message
         if (activeConversation) {
           updateContactLastMessage(
             activeConversation,
@@ -209,21 +210,17 @@ export function ChatWindow() {
 
     socket.on("message", handleMessage);
     
-    // Handle read receipts - when other person reads our messages
     const handleMessagesRead = (payload: any) => {
       const payloadConvId = String(payload.conversationId || "");
       if (payloadConvId === convIdHex && payload.reader && payload.reader.toLowerCase() !== me?.toLowerCase()) {
-        // Other person read the messages - mark our sent messages as read
         console.log("Read receipt received from:", payload.reader, "for conversation:", convIdHex);
         
-        // Use a small delay to ensure messages are loaded
         setTimeout(() => {
           const convMessages = messages[convIdHex] || [];
           const myMessages = convMessages.filter((msg) => msg.from === me && !msg.read);
           
           if (myMessages.length > 0) {
             console.log(`Marking ${myMessages.length} messages as read`);
-            // Mark all our messages as read
             myMessages.forEach((msg) => {
               markMessageRead(convIdHex, msg.id);
             });
@@ -233,7 +230,15 @@ export function ChatWindow() {
     };
     socket.on("messages-read", handleMessagesRead);
     
-    // Log when joined
+    const handleDeleteMessage = (payload: any) => {
+      const { conversationId: payloadConvId, messageId, deleteForEveryone } = payload;
+      if (String(payloadConvId) === convIdHex) {
+        console.log("Message delete received:", messageId, "deleteForEveryone:", deleteForEveryone);
+        deleteMessage(convIdHex, messageId, deleteForEveryone);
+      }
+    };
+    socket.on("delete-message", handleDeleteMessage);
+    
     socket.on("joined-conversation", (id: string) => {
       console.log("Joined conversation:", id);
     });
@@ -242,10 +247,20 @@ export function ChatWindow() {
       socket.off("connect", handleConnect);
       socket.off("message", handleMessage);
       socket.off("messages-read", handleMessagesRead);
+      socket.off("delete-message", handleDeleteMessage);
       socket.off("joined-conversation");
       socket.emit("leave-conversation", convIdHex);
     };
-  }, [conversationId, me, addMessage]);
+  }, [conversationId, me, addMessage, deleteMessage]);
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    if (contextMenu) {
+      document.addEventListener("click", handleClick);
+      return () => document.removeEventListener("click", handleClick);
+    }
+  }, [contextMenu]);
 
   async function handleSend(e: FormEvent) {
     e.preventDefault();
@@ -348,10 +363,8 @@ export function ChatWindow() {
       let address: `0x${string}`;
       
       if (addrLike) {
-        // It's an address
         address = cleaned.toLowerCase() as `0x${string}`;
       } else {
-        // It's a username - resolve to address
         const ownerAddress = await publicClient.readContract({
           address: registryAddress,
           abi: polygonChatRegistryAbi,
@@ -367,7 +380,6 @@ export function ChatWindow() {
         address = ownerAddress.toLowerCase() as `0x${string}`;
       }
       
-      // Fetch profile for this user
       const profile = await publicClient.readContract({
         address: registryAddress,
         abi: polygonChatRegistryAbi,
@@ -383,7 +395,6 @@ export function ChatWindow() {
           bio: profile.bio,
           avatarCid: profile.avatarCid,
         });
-        // Auto-open the conversation
         openConversation(address);
       } else {
         alert(`User does not have a profile yet.`);
@@ -403,6 +414,36 @@ export function ChatWindow() {
     setShowEmojiPicker(false);
   };
 
+  function handleMessageRightClick(e: React.MouseEvent, messageId: string) {
+    e.preventDefault();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      messageId,
+    });
+  }
+
+  function handleDeleteForMe() {
+    if (!contextMenu || !conversationId) return;
+    deleteMessage(String(conversationId), contextMenu.messageId, false);
+    setContextMenu(null);
+  }
+
+  function handleDeleteForEveryone() {
+    if (!contextMenu || !conversationId || !me) return;
+    deleteMessage(String(conversationId), contextMenu.messageId, true);
+    
+    const socket = getSocket();
+    socket.emit("delete-message", {
+      conversationId: String(conversationId),
+      messageId: contextMenu.messageId,
+      deleteForEveryone: true,
+      from: me,
+    });
+    
+    setContextMenu(null);
+  }
+
   if (!me) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-zinc-400">
@@ -417,6 +458,29 @@ export function ChatWindow() {
 
   return (
     <section className="flex flex-1 flex-col bg-gradient-to-br from-zinc-950 via-zinc-950 to-[#05010f]">
+      <div className="border-b border-zinc-900 px-5 py-3 bg-zinc-950/50 backdrop-blur-sm">
+        <form
+          onSubmit={handleOpenNewChat}
+          className="flex items-center gap-2"
+        >
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+            <input
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder="Search or start new chat: enter username or wallet address"
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-900/70 pl-10 pr-3 py-2 text-xs text-zinc-100 outline-none focus:border-violet-500 transition-colors"
+            />
+          </div>
+          <button
+            type="submit"
+            className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-500 transition-colors"
+          >
+            Start
+          </button>
+        </form>
+      </div>
+
       <header className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
         <div className="flex flex-col flex-1">
           <span className="text-xs text-zinc-500">Conversation</span>
@@ -503,46 +567,74 @@ export function ChatWindow() {
               : "Select a chat on the left or start a new one."}
           </div>
         )}
-        {convMessages.map((m) => {
-          const mine = m.from === me;
-          return (
-            <div
-              key={m.id}
-              className={`flex ${
-                mine ? "justify-end" : "justify-start"
-              } text-sm`}
-            >
+        {convMessages
+          .filter((m) => !m.deletedForMe && !m.deletedForEveryone)
+          .map((m) => {
+            const mine = m.from === me;
+            return (
               <div
-                className={`max-w-xs rounded-2xl px-3 py-2 ${
-                  mine
-                    ? "bg-violet-600 text-zinc-50 rounded-br-sm"
-                    : "bg-zinc-900 text-zinc-100 rounded-bl-sm"
-                }`}
+                key={m.id}
+                className={`flex ${
+                  mine ? "justify-end" : "justify-start"
+                } text-sm`}
+                onContextMenu={(e) => handleMessageRightClick(e, m.id)}
               >
-                <div>{m.body}</div>
-                <div className="mt-1 flex items-center justify-end gap-1 text-[10px] text-zinc-400">
-                  <span>
-                    {new Date(m.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  {mine && (
-                    <span title={m.read ? "Read" : "Sent"}>
-                      <CheckCheck
-                        className={`h-3 w-3 ${
-                          m.read ? "text-blue-400" : "text-zinc-500"
-                        }`}
-                      />
+                <div
+                  className={`max-w-xs rounded-2xl px-3 py-2 cursor-context-menu ${
+                    mine
+                      ? "bg-violet-600 text-zinc-50 rounded-br-sm"
+                      : "bg-zinc-900 text-zinc-100 rounded-bl-sm"
+                  }`}
+                >
+                  <div>{m.body}</div>
+                  <div className="mt-1 flex items-center justify-end gap-1 text-[10px] text-zinc-400">
+                    <span>
+                      {new Date(m.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </span>
-                  )}
+                    {mine && (
+                      <span title={m.read ? "Read" : "Sent"}>
+                        <CheckCheck
+                          className={`h-3 w-3 ${
+                            m.read ? "text-blue-400" : "text-zinc-500"
+                          }`}
+                        />
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
         <div ref={messagesEndRef} />
       </main>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 min-w-[180px] rounded-lg border border-zinc-800 bg-zinc-950 py-1 shadow-xl"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          <button
+            onClick={handleDeleteForMe}
+            className="flex w-full items-center gap-2 px-4 py-2 text-xs text-zinc-300 hover:bg-zinc-900"
+          >
+            <Trash2 className="h-3 w-3" />
+            Delete for me
+          </button>
+          {convMessages.find((m) => m.id === contextMenu.messageId)?.from === me && (
+            <button
+              onClick={handleDeleteForEveryone}
+              className="flex w-full items-center gap-2 px-4 py-2 text-xs text-red-400 hover:bg-zinc-900"
+            >
+              <Trash2 className="h-3 w-3" />
+              Delete for everyone
+            </button>
+          )}
+        </div>
+      )}
 
       <footer className="border-t border-zinc-800 px-5 py-3 relative">
         {showEmojiPicker && (

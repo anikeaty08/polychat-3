@@ -10,7 +10,9 @@ export interface ChatMessage {
   kind: MessageKind;
   createdAt: number;
   cid?: string;
-  read?: boolean; // Read receipt
+  read?: boolean;
+  deletedForMe?: boolean;
+  deletedForEveryone?: boolean;
 }
 
 export interface Contact {
@@ -45,6 +47,7 @@ interface ChatState {
   markConversationRead: (conversationId: string) => void;
   updateContactUnread: (address: string, increment: boolean) => void;
   updateContactLastMessage: (address: string, message: string, timestamp: number) => void;
+  deleteMessage: (conversationId: string, messageId: string, deleteForEveryone: boolean) => void;
 }
 
 // Load contacts from localStorage on init
@@ -86,7 +89,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   addMessage: (conversationId, msg) =>
     set((state) => {
       const existing = state.messages[conversationId] || [];
-      // Avoid duplicates
       if (existing.find(m => m.id === msg.id)) {
         return state;
       }
@@ -100,7 +102,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadMessages: (conversationId, messages) =>
     set((state) => {
       const existing = state.messages[conversationId] || [];
-      // Merge with existing messages, avoiding duplicates
       const existingIds = new Set(existing.map(m => m.id));
       const newMessages = messages.filter(m => !existingIds.has(m.id));
       const merged = [...existing, ...newMessages].sort((a, b) => a.createdAt - b.createdAt);
@@ -127,11 +128,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   markConversationRead: (conversationId) =>
     set((state) => {
       const convMessages = state.messages[conversationId] || [];
-      // Only update if there are actually unread messages to avoid unnecessary updates
       const hasUnread = convMessages.some((msg) => !msg.read);
-      if (!hasUnread) return state; // No changes needed
+      if (!hasUnread) return state;
       
-      // Mark messages as read
       const updatedMessages = convMessages.map((msg) => ({ ...msg, read: true }));
       
       return {
@@ -151,7 +150,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
               unreadCount: (contact.unreadCount || 0) + 1,
             };
           } else {
-            // Reset unread count
             return {
               ...contact,
               unreadCount: 0,
@@ -178,7 +176,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
       saveContactsToStorage(updatedContacts);
       return { contacts: updatedContacts };
     }),
+  deleteMessage: (conversationId, messageId, deleteForEveryone) =>
+    set((state) => {
+      const convMessages = state.messages[conversationId] || [];
+      return {
+        messages: {
+          ...state.messages,
+          [conversationId]: convMessages.map((msg) =>
+            msg.id === messageId
+              ? { 
+                  ...msg, 
+                  deletedForMe: true, 
+                  deletedForEveryone: deleteForEveryone ? true : msg.deletedForEveryone
+                }
+              : msg
+          ),
+        },
+      };
+    }),
 }));
-
-
-

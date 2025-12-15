@@ -70,6 +70,17 @@ io.on("connection", (socket) => {
     socket.to(conversationId).emit("messages-read", payload);
   });
 
+  socket.on("delete-message", (payload) => {
+    const { conversationId } = payload;
+    if (!conversationId) return;
+    console.log(`Message deleted in conversation: ${conversationId}`, {
+      messageId: payload.messageId,
+      deleteForEveryone: payload.deleteForEveryone,
+      from: payload.from,
+    });
+    socket.to(conversationId).emit("delete-message", payload);
+  });
+
   socket.on("disconnect", () => {
     console.log("client disconnected", socket.id);
   });
@@ -78,5 +89,3 @@ io.on("connection", (socket) => {
 server.listen(PORT, () => {
   console.log(`Realtime server listening on :${PORT}`);
 });
-
-
