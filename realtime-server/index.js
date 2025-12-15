@@ -86,6 +86,6 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Realtime server listening on :${PORT}`);
+server.listen(PORT, "127.0.0.1", () => {
+  console.log(`Realtime server listening on http://127.0.0.1:${PORT}`);
 });
