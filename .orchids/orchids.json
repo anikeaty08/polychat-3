@@ -1,0 +1,8 @@
+{
+  "projectId": "bebe073f-cb35-45db-a994-ed9dabc61e3d",
+  "createdAt": 1765814340457,
+  "startupCommands": [
+    "npm install; cd realtime-server && npm run dev",
+    "cd web && npm run dev"
+  ]
+}
