@@ -1,8 +1,14 @@
 # Polygon Chat Application
 
-A fully functional **WhatsApp-like** decentralized chat application built on **Polygon Amoy testnet** with **Lighthouse** for decentralized storage. Features real-time messaging, voice/video calls, user profiles, and blockchain-based identity management.
+A fully functional **WhatsApp-like** decentralized chat application built on **Polygon Amoy testnet** with **Lighthouse** for decentralized storage. Features real-time messaging, voice/video calls, **end-to-end encryption**, user profiles, and blockchain-based identity management.
 
 ## 🚀 Current Features
+
+### 🔐 Security
+- ✅ **End-to-End Encryption** - Military-grade E2EE using ECDH key exchange and AES-GCM encryption
+- ✅ **Encrypted Messaging** - All messages encrypted before transmission
+- ✅ **Key Management** - Secure key pair generation and storage using Web Crypto API
+- ✅ **Privacy First** - Only you and your recipient can read messages
 
 ### Core Messaging
 - ✅ **Real-time Chat** - Instant messaging with Socket.io
@@ -11,6 +17,10 @@ A fully functional **WhatsApp-like** decentralized chat application built on **P
 - ✅ **Unread Counts** - Badge indicators showing unread message counts
 - ✅ **Message History** - Load previous conversations from blockchain
 - ✅ **Auto-contact Discovery** - Contacts automatically added when receiving messages/calls
+- ✅ **Delete Messages** - Delete messages for yourself or for everyone
+- ✅ **Context Menu** - Right-click on messages for quick actions
+- ✅ **Emoji Picker** - Express yourself with built-in emoji support
+- ✅ **Persistent Search** - Search/start new chats even when viewing existing conversations
 
 ### User Management
 - ✅ **Profile Creation** - Create unique username, display name, bio, and avatar
@@ -24,14 +34,18 @@ A fully functional **WhatsApp-like** decentralized chat application built on **P
 - ✅ **Video Calls** - WebRTC-based peer-to-peer video calling with camera/mic controls
 - ✅ **Call Controls** - Toggle video, mute audio, and hang up
 - ✅ **Real-time Signaling** - Socket.io for call setup and signaling
+- ✅ **Ring Notifications** - Get notified when receiving calls
 
 ### User Experience
-- ✅ **Modern UI/UX** - Beautiful, responsive design with dark theme
-- ✅ **Contact List** - Sorted by most recent activity
+- ✅ **Modern UI/UX** - Beautiful, responsive design with dark theme and violet accents
+- ✅ **Splash Screen** - Animated welcome screen with E2E encryption badge
+- ✅ **Smooth Animations** - Slide-in, fade-in, and pulse animations throughout
+- ✅ **Contact List** - Sorted by most recent activity with unread badges
 - ✅ **Last Message Preview** - See last message in contact list
 - ✅ **Auto-scroll** - Smooth message viewing experience
 - ✅ **Persistent Storage** - Contacts saved in localStorage
 - ✅ **Session Persistence** - Previous chats available after logout/login
+- ✅ **Custom Scrollbars** - Themed scrollbars matching the UI design
 
 ## 📋 Prerequisites
 
@@ -144,7 +158,7 @@ App runs on `http://localhost:3000`
 
 ## 📁 Project Structure
 
-```
+```text
 polychat-3/
 ├── contracts/              # Smart contracts (Hardhat)
 │   ├── contracts/         # Solidity contracts
