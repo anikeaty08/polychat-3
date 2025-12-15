@@ -35,28 +35,24 @@ A fully functional **WhatsApp-like** decentralized chat application built on **P
 
 ## 📋 Prerequisites
 
-- **Node.js** 18+ and npm
+- **Node.js** 18+ and npm (or bun)
 - **MetaMask** wallet with Polygon Amoy testnet configured
 - **Amoy testnet MATIC** - Get from [Polygon Faucet](https://faucet.polygon.technology/)
 - **Lighthouse API key** - Get from [Lighthouse Storage](https://lighthouse.storage/)
-- **Alchemy/Infura account** - For Polygon Amoy RPC endpoint
+- **Alchemy account** - For Polygon Amoy RPC endpoint
 
 ## 🔧 Setup Instructions
 
 ### 1. Clone and Install
 
 ```bash
-# Install contract dependencies
-cd contracts
+# Install all dependencies (root handles workspaces)
 npm install
 
-# Install frontend dependencies
-cd ../web
-npm install
-
-# Install realtime server dependencies
-cd ../realtime-server
-npm install
+# Or manually install each workspace
+cd contracts && npm install
+cd ../web && npm install
+cd ../realtime-server && npm install
 ```
 
 ### 2. Environment Variables
@@ -66,10 +62,10 @@ Create a `.env` file in the **root** directory:
 ```env
 # Blockchain / Hardhat
 AMOY_RPC_URL=https://polygon-amoy.g.alchemy.com/v2/YOUR_AMOY_KEY
-DEPLOYER_PRIVATE_KEY=0xYOUR_PRIVATE_KEY
+DEPLOYER_PRIVATE_KEY=YOUR_PRIVATE_KEY
 ETHERSCAN_API_KEY=YOUR_ETHERSCAN_KEY
 
-# Storage Providers
+# Storage
 LIGHTHOUSE_API_KEY=YOUR_LIGHTHOUSE_KEY
 ```
 
@@ -82,13 +78,15 @@ NEXT_PUBLIC_CHAT_REGISTRY_ADDRESS=0x32593a5A622baC68B58A19315A55eF9e785C9F0E
 NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
 NEXT_PUBLIC_LIGHTHOUSE_GATEWAY=https://gateway.lighthouse.storage/ipfs
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=demo
+
+# Server-side Lighthouse
 LIGHTHOUSE_API_KEY=YOUR_LIGHTHOUSE_KEY
 ```
 
 **⚠️ IMPORTANT:** 
 - Replace all `YOUR_*` placeholders with actual values
 - The contract is already deployed at `0x32593a5A622baC68B58A19315A55eF9e785C9F0E`
-- See [ENV_SETUP.md](./ENV_SETUP.md) for detailed API key setup instructions
+- Never commit your private keys or API keys
 
 ### 3. Start the Application
 
@@ -115,137 +113,106 @@ App runs on `http://localhost:3000`
 4. Ensure MetaMask is connected to **Polygon Amoy** testnet
 
 ### Create Profile
-"""
-# Polygon Chat Application
+1. After connecting, you'll be prompted to create a profile
+2. Choose a unique **username** (3-32 characters)
+3. Add a **display name** (optional, what friends see)
+4. Write a **bio** (optional)
+5. Upload an **avatar** (optional, stored on Lighthouse)
+6. Click **"Create Profile"** and confirm the transaction
 
-A decentralized, WhatsApp-like chat application using Polygon (Amoy testnet) for identity and pointer storage, and Lighthouse/IPFS for message/media storage. It includes a Next.js frontend (`web`), smart contracts (`contracts`), and a Socket.io realtime server (`realtime-server`).
+### Start Chatting
+1. Click the input at the top that says "New chat: enter wallet address or username"
+2. Enter a friend's wallet address (0x...) or username
+3. Click **"Start"** to open the conversation
+4. Type your message and click **"Send"**
+5. Confirm the transaction in MetaMask
 
-## Table of contents
-- [Features](#features)
-- [Tech stack](#tech-stack)
-- [Prerequisites](#prerequisites)
-- [Quickstart](#quickstart)
-- [Environment variables](#environment-variables)
-- [Running locally](#running-locally)
-- [Testing](#testing)
-- [Project structure](#project-structure)
-- [Contributing](#contributing)
-- [License](#license)
+### Voice/Video Calls
+1. Open a conversation with a contact
+2. Click the **phone icon** (voice) or **video icon** (video call)
+3. Your contact will receive a call notification
+4. They can accept or decline the call
+5. Use controls to mute/unmute, toggle video, or hang up
 
-## Features
-- Real-time chat (Socket.io)
-- Message persistence via Lighthouse/IPFS with on-chain pointers
-- Read receipts, unread counts, and message history
-- Profile creation/updates stored on-chain
-- Peer-to-peer voice/video calls (WebRTC)
+## 🏗️ Tech Stack
 
-## Tech stack
-- Blockchain: Solidity, Hardhat, Polygon Amoy (testnet)
-- Frontend: Next.js 14, TypeScript, Tailwind CSS
-- Real-time: Socket.io, WebRTC (simple-peer)
-- Storage: Lighthouse / IPFS
+- **Blockchain**: Solidity, Hardhat, Polygon Amoy testnet
+- **Frontend**: Next.js 16, TypeScript, Tailwind CSS, Wagmi v2
+- **Real-time**: Socket.io, WebRTC (simple-peer)
+- **Storage**: Lighthouse/IPFS for decentralized file storage
+- **State**: Zustand with localStorage persistence
 
-## Prerequisites
-- Node.js 18+ and npm
-- MetaMask (or another Web3 wallet) pointed to Polygon Amoy
-- Amoy testnet MATIC (Polygon faucet)
+## 📁 Project Structure
 
-## Quickstart
-1. Install dependencies:
-
-```powershell
-cd contracts
-npm ci
-cd ../web
-npm ci
-cd ../realtime-server
-npm ci
-cd ..
+```
+polychat-3/
+├── contracts/              # Smart contracts (Hardhat)
+│   ├── contracts/         # Solidity contracts
+│   ├── scripts/           # Deployment scripts
+│   └── test/              # Contract tests
+├── web/                   # Next.js frontend
+│   ├── src/
+│   │   ├── app/          # Next.js App Router pages
+│   │   ├── components/   # React components
+│   │   ├── lib/          # Utilities and configs
+│   │   └── state/        # Zustand stores
+│   └── public/           # Static assets
+├── realtime-server/       # Socket.io server
+│   └── index.js          # WebSocket & signaling server
+└── package.json          # Workspace root
 ```
 
-2. Create and fill `.env` files (see next section).
+## 🧪 Testing
 
-3. Start services (three terminals recommended):
-
-Terminal 1 — Realtime server:
-```powershell
-cd realtime-server
-npm run dev
-```
-
-Terminal 2 — Frontend:
-```powershell
-cd web
-npm run dev
-```
-
-Terminal 3 — (optional) Contracts / testing:
-```powershell
-cd contracts
-npx hardhat node   # local node if needed
-```
-
-The frontend runs by default at `http://localhost:3000` and the realtime server at `http://localhost:3001`.
-
-## Environment variables
-
-Add a `.env` in the repository root for contract/deploy keys and a `.env` inside `/web` for frontend runtime vars. Example keys:
-
-Root `.env` (contracts):
-
-```env
-AMOY_RPC_URL=https://polygon-amoy.g.alchemy.com/v2/YOUR_AMOY_KEY
-DEPLOYER_PRIVATE_KEY=0xYOUR_PRIVATE_KEY
-```
-
-`web/.env` (frontend):
-
-```env
-NEXT_PUBLIC_AMOY_RPC_URL=https://polygon-amoy.g.alchemy.com/v2/YOUR_AMOY_KEY
-NEXT_PUBLIC_CHAT_REGISTRY_ADDRESS=0x32593a5A622baC68B58A19315A55eF9e785C9F0E
-NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
-LIGHTHOUSE_API_KEY=YOUR_LIGHTHOUSE_KEY
-```
-
-Replace placeholders with real values. Do not commit secrets.
-
-## Running tests
-
-Contracts:
-
-```powershell
+**Contract Tests:**
+```bash
 cd contracts
 npx hardhat test
 ```
 
-Frontend:
+**Frontend:**
+Open `http://localhost:3000` in two different browsers or incognito windows to test messaging between two users.
 
-```powershell
-cd web
-npm test
-```
+## 🛠️ Development
 
-## Project structure
+- **Lint**: `npm run lint` (in web directory)
+- **Type Check**: `npm run type-check` (if configured)
+- **Build**: `npm run build` (in web directory)
 
-```
-polygon/
-├─ contracts/           # Smart contracts (Hardhat)
-├─ web/                 # Next.js frontend
-├─ realtime-server/     # Socket.io server
-├─ .github/             # CI workflows
-├─ LICENSE
-└─ README.md
-```
+## 📝 Smart Contract
 
-For full file layout see the repository tree in this workspace.
+The `PolygonChatRegistry` contract is deployed at:
+- **Address**: `0x32593a5A622baC68B58A19315A55eF9e785C9F0E`
+- **Network**: Polygon Amoy Testnet
 
-## Contributing
-Please read `CONTRIBUTING.md` for guidelines. Open issues or pull requests on GitHub.
+### Key Functions:
+- `registerProfile(username, avatarCid, bio, displayName)` - Create user profile
+- `updateProfile(avatarCid, bio, displayName)` - Update profile details
+- `changeUsername(newUsername)` - Change username
+- `upsertMessagePointer(recipient, cid, contentHash)` - Store message pointer
+- `setBlockStatus(user, blocked)` - Block/unblock users
+- `getProfile(address)` - Get user profile
+- `ownerOfUsername(username)` - Find address by username
 
-## License
-This project is licensed under the MIT License — see the `LICENSE` file for details.
+## 🔒 Security Notes
+
+- Never commit `.env` files or private keys
+- Private keys in `.env` are for development only
+- Use environment variables for production deployments
+- Lighthouse API keys should be kept secure
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
 
 ---
 
-If you'd like, I can also add badges (build/status, license) or a short demo GIF.
-"""
+**Built with ❤️ using Polygon, Lighthouse, and Next.js**
