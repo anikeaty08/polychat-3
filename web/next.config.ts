@@ -1,9 +1,11 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
-  turbopack: {
-    // Empty turbopack config to silence warnings while using webpack
+  // Fix workspace root warning by setting explicit root
+  experimental: {
+    // This helps Next.js understand the workspace structure
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {

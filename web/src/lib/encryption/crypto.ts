@@ -131,8 +131,12 @@ export async function decryptMessage(
   iv: string,
   sharedKey: CryptoKey
 ): Promise<string> {
-  const encryptedData = base64ToArrayBuffer(ciphertext);
-  const ivArray = base64ToArrayBuffer(iv);
+  const encryptedDataBytes = base64ToArrayBuffer(ciphertext);
+  // Create a new ArrayBuffer to ensure proper typing
+  const encryptedData = new Uint8Array(encryptedDataBytes).buffer;
+  const ivBytes = base64ToArrayBuffer(iv);
+  // Create a new Uint8Array to ensure proper typing
+  const ivArray = new Uint8Array(ivBytes);
 
   const decryptedData = await window.crypto.subtle.decrypt(
     {
