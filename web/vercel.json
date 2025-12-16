@@ -1,4 +1,8 @@
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install --include=optional",
+  "framework": null,
   "env": {
     "CSS_TRANSFORMER_WASM": "1"
   },
@@ -6,6 +10,5 @@
     "env": {
       "CSS_TRANSFORMER_WASM": "1"
     }
-  },
-  "installCommand": "npm install"
+  }
 }

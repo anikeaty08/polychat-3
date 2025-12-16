@@ -5,8 +5,11 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
   // Fix workspace root warning for monorepo setups
   outputFileTracingRoot: path.join(__dirname),
-  // Set empty turbopack config to use webpack instead
-  turbopack: {},
+  // Explicitly disable Turbopack to use webpack
+  // This ensures compatibility with native modules like lightningcss
+  experimental: {
+    // Force webpack usage
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       // Replace pino with empty module in browser builds
