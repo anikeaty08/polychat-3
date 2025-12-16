@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
   // Fix workspace root warning for monorepo setups
   outputFileTracingRoot: path.join(__dirname),
+  // Ensure static assets are served correctly
+  trailingSlash: false,
   // Explicitly disable Turbopack to use webpack
   // This ensures compatibility with native modules like lightningcss
   experimental: {
