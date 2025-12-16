@@ -10,7 +10,6 @@ import { uploadJsonToLighthouse, fetchLighthouseJson } from "../lib/lighthouse";
 import { CallPanel } from "./call-panel";
 import { Ban, CheckCheck, Smile, Search, Trash2 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { Theme } from "emoji-picker-react";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
@@ -640,7 +639,7 @@ export function ChatWindow() {
       <footer className="border-t border-zinc-800 px-5 py-3 relative">
         {showEmojiPicker && (
           <div className="absolute bottom-16 right-5 z-50">
-            <EmojiPicker onEmojiClick={onEmojiClick} theme={Theme.DARK} />
+            <EmojiPicker onEmojiClick={onEmojiClick} theme="dark" />
           </div>
         )}
         <form

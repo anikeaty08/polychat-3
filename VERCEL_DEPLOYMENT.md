@@ -1,41 +1,45 @@
 # Vercel Deployment Fix
 
-## Issue
-Vercel is using Turbopack by default in Next.js 16, which causes issues with `lightningcss` (used by Tailwind CSS v4).
+## Issue Fixed ✅
+The original issue was that Vercel was using Turbopack by default in Next.js 16, which caused issues with `lightningcss` (used by Tailwind CSS v4).
 
-## Solution
-The build script in `package.json` includes `--webpack` flag to force webpack usage:
+## Solution Applied
+**Downgraded Tailwind CSS from v4 to v3.4.17** to eliminate the `lightningcss` dependency entirely. This ensures compatibility with both webpack and Turbopack.
+
+### Changes Made:
+1. **Tailwind CSS**: Downgraded from v4 to v3.4.17
+2. **PostCSS Config**: Updated to use standard Tailwind v3 plugins
+3. **Tailwind Config**: Created `tailwind.config.js` for v3
+4. **globals.css**: Updated from `@import "tailwindcss"` to standard `@tailwind` directives
+5. **Removed**: `lightningcss` and `@tailwindcss/postcss` dependencies
+
+## Current Configuration
+
+### package.json
+- `tailwindcss`: `^3.4.17`
+- `autoprefixer`: `^10.4.20`
+- `postcss`: `^8.4.47`
+- Build script: `next build --webpack`
+
+### vercel.json
 ```json
-"build": "next build --webpack"
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "framework": null
+}
 ```
 
-## Vercel Configuration
+## Vercel Dashboard Settings (Optional)
+If needed, configure in Vercel Dashboard:
 
-### Option 1: Use vercel.json (Already configured)
-The `web/vercel.json` file is configured to use `npm run build` which includes the `--webpack` flag.
-
-### Option 2: Vercel Dashboard Settings
-If the build still fails, configure in Vercel Dashboard:
-
-1. Go to your project settings in Vercel
-2. Navigate to **Settings** → **General**
-3. Set **Root Directory** to `web`
-4. Go to **Settings** → **Build & Development Settings**
-5. Set **Build Command** to: `npm run build`
-6. Set **Output Directory** to: `.next`
-7. Set **Install Command** to: `npm install --include=optional`
-
-### Important Notes
-- The `--webpack` flag in the build script ensures webpack is used instead of Turbopack
-- `lightningcss` is added as a dev dependency to ensure it's available
-- Optional dependencies are included in the install command to ensure native modules are installed
+1. Go to **Settings** → **General**
+2. Set **Root Directory** to `web`
+3. Go to **Settings** → **Build & Development Settings**
+4. Verify **Build Command** is: `npm run build`
+5. Verify **Output Directory** is: `.next`
 
 ## Verification
-After deployment, check the build logs to ensure it shows:
-```
-▲ Next.js 16.0.4 (webpack)
-```
-NOT:
-```
-▲ Next.js 16.0.4 (Turbopack)
-```
+The build should now work on Vercel without any `lightningcss` errors. The app uses Tailwind CSS v3 which is fully compatible with both webpack and Turbopack.
+
