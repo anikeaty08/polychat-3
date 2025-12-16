@@ -5,7 +5,7 @@ services:
     plan: free
     root: web
     build:
-      command: npm ci && npm run build
+      command: cd web && npm ci && npm run build
     start: npm start
     envVars:
       - key: NODE_ENV

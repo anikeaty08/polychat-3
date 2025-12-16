@@ -3,10 +3,10 @@ import path from "path";
 
 const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
-  // Fix workspace root warning by setting explicit root
-  experimental: {
-    // This helps Next.js understand the workspace structure
-  },
+  // Fix workspace root warning for monorepo setups
+  outputFileTracingRoot: path.join(__dirname),
+  // Set empty turbopack config to use webpack instead
+  turbopack: {},
   webpack: (config, { isServer }) => {
     if (!isServer) {
       // Replace pino with empty module in browser builds
