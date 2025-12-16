@@ -118,7 +118,7 @@ export async function encryptMessage(
 
   // Convert to base64 for storage/transmission
   const ciphertext = arrayBufferToBase64(encryptedData);
-  const ivBase64 = arrayBufferToBase64(iv);
+  const ivBase64 = arrayBufferToBase64(iv.buffer.slice(iv.byteOffset, iv.byteOffset + iv.byteLength));
 
   return { ciphertext, iv: ivBase64 };
 }
