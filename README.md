@@ -76,7 +76,7 @@
 - 🦊 **Wallet Auth** - MetaMask, WalletConnect
 - 🪙 **Polygon Network** - Fast & cheap transactions
 - 📦 **IPFS Storage** - Decentralized file storage
-- 📜 **Smart Contracts** - On-chain messaging
+- 📜 **Smart Contracts** - On-chain messaging / call /status/setting
 - 💸 **Payments** - Server-verified escrow
 
 </td>
