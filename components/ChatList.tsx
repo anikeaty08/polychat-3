@@ -93,40 +93,44 @@ export default function ChatList() {
     }
 
     const searchLower = searchQuery.toLowerCase().trim();
-    
+
     const filtered = conversations.filter((conv) => {
       const participant = conv.participant;
-      if (!participant) return false;
 
-      // Search in participant details
-      const matchesUsername = participant.username?.toLowerCase().includes(searchLower);
-      const matchesDisplayName = participant.display_name?.toLowerCase().includes(searchLower);
-      const matchesWallet = participant.wallet_address?.toLowerCase().includes(searchLower);
-      
-      // Search in last message
-      const lastMsg = conv.last_message;
-      let matchesMessage = false;
-      if (lastMsg) {
-        // Search in text content
-        if (lastMsg.content && typeof lastMsg.content === 'string') {
-          matchesMessage = lastMsg.content.toLowerCase().includes(searchLower);
-        }
-        // Search by message type
-        const messageTypeLabels: Record<string, string> = {
-          'audio': 'voice message audio recording',
-          'image': 'photo picture image',
-          'video': 'video clip movie',
-          'file': 'file document attachment',
-        };
-        if (lastMsg.message_type && messageTypeLabels[lastMsg.message_type]) {
-          matchesMessage = matchesMessage || messageTypeLabels[lastMsg.message_type].includes(searchLower);
+      // Search in username
+      const usernameMatch = participant?.username
+        ? participant.username.toLowerCase().includes(searchLower)
+        : false;
+
+      // Search in display name
+      const displayNameMatch = participant?.display_name
+        ? participant.display_name.toLowerCase().includes(searchLower)
+        : false;
+
+      // Search in wallet address (partial match)
+      const walletMatch = participant?.wallet_address
+        ? participant.wallet_address.toLowerCase().includes(searchLower)
+        : false;
+
+      // Search in last message content (only for text messages)
+      let messageMatch = false;
+      if (conv.last_message) {
+        if (conv.last_message.message_type === 'text' && conv.last_message.content) {
+          messageMatch = conv.last_message.content.toLowerCase().includes(searchLower);
+        } else {
+          // For non-text messages, search in the message type description
+          const messageTypeDescriptions: Record<string, string> = {
+            'audio': 'voice message',
+            'image': 'photo',
+            'video': 'video',
+            'file': 'file',
+          };
+          const description = messageTypeDescriptions[conv.last_message.message_type] || '';
+          messageMatch = description.includes(searchLower);
         }
       }
-      
-      // Search in conversation name (for groups)
-      const matchesConversationName = conv.name?.toLowerCase().includes(searchLower);
 
-      return matchesUsername || matchesDisplayName || matchesWallet || matchesMessage || matchesConversationName;
+      return usernameMatch || displayNameMatch || walletMatch || messageMatch;
     });
 
     setFilteredConversations(filtered);
@@ -163,7 +167,7 @@ export default function ChatList() {
               <Search className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             </button>
             <div className="relative">
-              <button 
+              <button
                 className="p-2.5 hover:bg-gray-100/80 dark:hover:bg-gray-700/80 rounded-xl transition-all active:scale-95"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -172,10 +176,10 @@ export default function ChatList() {
               >
                 <MoreVertical className="w-5 h-5 text-gray-600 dark:text-gray-400" />
               </button>
-              
+
               {showMenu && (
                 <>
-                  <div 
+                  <div
                     className="fixed inset-0 z-40"
                     onClick={() => setShowMenu(false)}
                   />
@@ -234,20 +238,22 @@ export default function ChatList() {
         {/* Search Bar */}
         <div className="px-4 pb-4">
           <div className="relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-violet-500 transition-colors z-10" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
             <input
               type="text"
               placeholder="Search conversations by name, username, or message..."
               value={searchQuery}
               onChange={(e) => {
-                setSearchQuery(e.target.value);
+                const value = e.target.value;
+                setSearchQuery(value);
               }}
               onKeyDown={(e) => {
+                // Allow escape to clear search
                 if (e.key === 'Escape') {
                   setSearchQuery('');
                 }
               }}
-              className="w-full pl-12 pr-4 py-3.5 bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:bg-white dark:focus:bg-gray-900 transition-all shadow-sm hover:shadow-md"
+              className="w-full pl-12 pr-10 py-3.5 bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:bg-white dark:focus:bg-gray-900 transition-all shadow-sm hover:shadow-md"
             />
             {searchQuery && (
               <button
@@ -255,7 +261,7 @@ export default function ChatList() {
                 className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
                 title="Clear search"
               >
-                <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <X className="w-4 h-4 text-gray-400" />
               </button>
             )}
           </div>
@@ -273,11 +279,10 @@ export default function ChatList() {
         <div className="flex bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
           <button
             onClick={() => setActiveTab('chats')}
-            className={`flex-1 py-4 text-center font-semibold transition-all duration-300 relative ${
-              activeTab === 'chats'
+            className={`flex-1 py-4 text-center font-semibold transition-all duration-300 relative ${activeTab === 'chats'
                 ? 'text-violet-600 dark:text-violet-400'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
+              }`}
           >
             <div className="flex items-center justify-center gap-2">
               <MessageCircle className={`w-5 h-5 ${activeTab === 'chats' ? 'scale-110' : ''} transition-transform`} />
@@ -289,11 +294,10 @@ export default function ChatList() {
           </button>
           <button
             onClick={() => setActiveTab('status')}
-            className={`flex-1 py-4 text-center font-semibold transition-all duration-300 relative ${
-              activeTab === 'status'
+            className={`flex-1 py-4 text-center font-semibold transition-all duration-300 relative ${activeTab === 'status'
                 ? 'text-violet-600 dark:text-violet-400'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
+              }`}
           >
             <div className="flex items-center justify-center gap-2">
               <Circle className={`w-5 h-5 ${activeTab === 'status' ? 'scale-110' : ''} transition-transform`} />
@@ -308,11 +312,10 @@ export default function ChatList() {
               setActiveTab('calls');
               router.push('/calls');
             }}
-            className={`flex-1 py-4 text-center font-semibold transition-all duration-300 relative ${
-              activeTab === 'calls'
+            className={`flex-1 py-4 text-center font-semibold transition-all duration-300 relative ${activeTab === 'calls'
                 ? 'text-violet-600 dark:text-violet-400'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
+              }`}
           >
             <div className="flex items-center justify-center gap-2">
               <Phone className={`w-5 h-5 ${activeTab === 'calls' ? 'scale-110' : ''} transition-transform`} />
@@ -339,7 +342,9 @@ export default function ChatList() {
                 {searchQuery ? 'No conversations found' : 'No conversations yet'}
               </h2>
               <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-xs">
-                {searchQuery ? 'Try a different search term' : 'Start a new chat to begin secure messaging'}
+                {searchQuery
+                  ? `No conversations match "${searchQuery}". Try searching by username, display name, or message content.`
+                  : 'Start a new chat to begin secure messaging'}
               </p>
               {!searchQuery && (
                 <button
@@ -352,6 +357,11 @@ export default function ChatList() {
             </div>
           ) : (
             <div className="p-2">
+              {searchQuery && (
+                <div className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  Found {filteredConversations.length} conversation{filteredConversations.length !== 1 ? 's' : ''} matching "{searchQuery}"
+                </div>
+              )}
               {filteredConversations.map((conversation, index) => (
                 <div
                   key={conversation.id}
@@ -392,10 +402,10 @@ export default function ChatList() {
                     <div className="flex items-center space-x-2">
                       <p className="text-sm text-gray-600 dark:text-gray-400 truncate flex-1">
                         {conversation.last_message?.message_type === 'audio' ? '🎤 Voice message' :
-                         conversation.last_message?.message_type === 'image' ? '📷 Photo' :
-                         conversation.last_message?.message_type === 'video' ? '🎥 Video' :
-                         conversation.last_message?.message_type === 'file' ? '📎 File' :
-                         conversation.last_message?.content || 'Start chatting...'}
+                          conversation.last_message?.message_type === 'image' ? '📷 Photo' :
+                            conversation.last_message?.message_type === 'video' ? '🎥 Video' :
+                              conversation.last_message?.message_type === 'file' ? '📎 File' :
+                                conversation.last_message?.content || 'Start chatting...'}
                       </p>
                       {conversation.unread_count > 0 && (
                         <span className="flex-shrink-0 bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg animate-pulse">
