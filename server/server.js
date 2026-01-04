@@ -1,5 +1,5 @@
 // Socket.io server for real-time messaging
-// Run this separately: node server.js
+// Run this separately: node server/server.js
 // Or integrate into Next.js API route
 
 const { Server } = require('socket.io');
@@ -17,7 +17,7 @@ const io = new Server(PORT, {
 
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
-  
+
   if (!token) {
     return next(new Error('Authentication error'));
   }
@@ -34,10 +34,10 @@ io.use((socket, next) => {
 
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.userId}`);
-  
+
   // Join user's personal room for direct notifications
   socket.join(`user:${socket.userId}`);
-  
+
   // Notify that user is online
   socket.broadcast.emit('user_status_change', {
     userId: socket.userId,
@@ -56,7 +56,7 @@ io.on('connection', (socket) => {
 
   socket.on('send_message', (data) => {
     const { conversationId, message } = data;
-    
+
     // Broadcast to all users in the conversation
     io.to(`conversation:${conversationId}`).emit('new_message', {
       ...message,
@@ -102,7 +102,7 @@ io.on('connection', (socket) => {
 
   socket.on('initiate_call', (data) => {
     const { conversationId, callId, callType, receiverId } = data;
-    
+
     // Notify receiver
     io.to(`user:${receiverId}`).emit('call_initiated', {
       conversationId,
@@ -110,7 +110,7 @@ io.on('connection', (socket) => {
       callType,
       callerId: socket.userId,
     });
-    
+
     // Also broadcast to conversation room
     io.to(`conversation:${conversationId}`).emit('call_initiated', {
       conversationId,
