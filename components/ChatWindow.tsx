@@ -57,7 +57,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     setActiveConversation(conversationId);
     loadConversation();
     loadMessages();
-    
+
     // Initialize socket after a small delay to ensure token is available
     const socketCleanup = initializeSocket();
 
@@ -96,7 +96,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       if (response.ok) {
         const data = await response.json();
         const messagesList = data.messages || [];
-        
+
         // Extract reactions from messages
         const reactionsMap: Record<string, any[]> = {};
         messagesList.forEach((msg: any) => {
@@ -106,7 +106,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
           }
         });
         setMessageReactions(reactionsMap);
-        
+
         // Set messages in store
         useChatStore.setState((state) => ({
           messages: {
@@ -143,7 +143,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
           (p: any) => p.user_id !== user?.id
         )?.user || data.conversation?.participant;
         setParticipant(otherParticipant);
-        
+
         if (otherParticipant?.id) {
           checkIfBlocked(otherParticipant.id);
         }
@@ -202,11 +202,11 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     newSocket.on('new_message', (message: any) => {
       console.log('Received new message via socket:', message);
       const msgConversationId = message.conversation_id || message.conversationId;
-      
+
       if (msgConversationId === conversationId) {
         const currentMessages = messages[conversationId] || [];
         const messageExists = currentMessages.some((msg: any) => msg.id === message.id);
-        
+
         if (!messageExists) {
           console.log('Adding new message to store:', message);
           addMessage(conversationId, {
@@ -336,7 +336,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || !socket) return;
-    
+
     if (isBlocked) {
       toast.error('You have blocked this user. Unblock to send messages.');
       return;
@@ -431,11 +431,11 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
         }
       } catch (error: any) {
         console.error('Send message error:', error);
-        const errorMessage = error.message?.includes('Failed to process') 
+        const errorMessage = error.message?.includes('Failed to process')
           ? 'Failed to send message. Please try again.'
           : error.message?.includes('not configured') || error.message?.includes('temporarily unavailable')
-          ? 'Service temporarily unavailable. Please try again later.'
-          : 'Failed to send message. Please try again.';
+            ? 'Service temporarily unavailable. Please try again later.'
+            : 'Failed to send message. Please try again.';
         toast.error(errorMessage, { id: 'send-message' });
         try {
           const response = await fetch('/api/messages', {
@@ -503,7 +503,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
   const handleClearChat = async () => {
     if (!confirm('Are you sure you want to clear all messages in this chat?')) return;
-    
+
     try {
       const response = await fetch(`/api/conversations/${conversationId}/clear`, {
         method: 'DELETE',
@@ -645,7 +645,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
     try {
       toast.loading('Initiating video call...', { id: 'initiate-video-call' });
-      
+
       const response = await fetch('/api/calls/create', {
         method: 'POST',
         headers: {
@@ -695,7 +695,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
     try {
       toast.loading('Initiating call...', { id: 'initiate-call' });
-      
+
       const response = await fetch('/api/calls/create', {
         method: 'POST',
         headers: {
@@ -750,7 +750,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
     // Process as image
     await processAndSendFile(file, 'image');
-    
+
     if (cameraInputRef.current) {
       cameraInputRef.current.value = '';
     }
@@ -766,7 +766,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     try {
       setUploading(true);
       toast.loading('Sending photo...', { id: 'file-upload' });
-      
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append('conversationId', conversationId);
@@ -910,7 +910,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     try {
       setUploading(true);
       toast.loading('Uploading file...', { id: 'file-upload' });
-      
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append('conversationId', conversationId);
@@ -1087,12 +1087,12 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      
+
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
         recordingTimerRef.current = null;
       }
-      
+
       setRecordingTime(0);
     }
   };
@@ -1103,7 +1103,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       toast.loading('Sending voice message...', { id: 'voice-message' });
 
       // Create a File object from the Blob with proper name and type
-      const audioFile = new File([audioBlob], `voice-message-${Date.now()}.webm`, {
+      const audioFile = new (File as any)([audioBlob], `voice-message-${Date.now()}.webm`, {
         type: 'audio/webm',
         lastModified: Date.now(),
       });
@@ -1184,11 +1184,11 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       toast.success('Voice message sent!', { id: 'voice-message' });
     } catch (error: any) {
       console.error('Send voice message error:', error);
-      const errorMessage = error.message?.includes('Failed to process') 
+      const errorMessage = error.message?.includes('Failed to process')
         ? 'Failed to send voice message. Please try again.'
         : error.message?.includes('not configured') || error.message?.includes('temporarily unavailable')
-        ? 'Service temporarily unavailable. Please try again later.'
-        : 'Failed to send voice message. Please try again.';
+          ? 'Service temporarily unavailable. Please try again later.'
+          : 'Failed to send voice message. Please try again.';
       toast.error(errorMessage, { id: 'voice-message' });
     } finally {
       setUploading(false);
@@ -1204,7 +1204,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       const existingReaction = currentReactions.find(
         (r) => r.emoji === emoji && r.user_id === user?.id
       );
-      
+
       if (existingReaction) {
         // Remove reaction
         return {
@@ -1234,7 +1234,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
       if (response.ok) {
         const data = await response.json();
-        
+
         // Fetch updated reactions
         const reactionsResponse = await fetch(`/api/messages/reactions?messageId=${messageId}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -1274,7 +1274,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
   const handleAcceptCall = async () => {
     if (!currentCall || !token) return;
-    
+
     try {
       const response = await fetch(`/api/calls/${currentCall.id}`, {
         method: 'PATCH',
@@ -1315,7 +1315,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
         },
         body: JSON.stringify({ status: 'declined' }),
       });
-      
+
       if (response.ok) {
         setIsCallOpen(false);
         setCurrentCall(null);
@@ -1338,7 +1338,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
   const handleEndCall = async () => {
     if (!currentCall || !token) return;
-    
+
     try {
       await fetch(`/api/calls/${currentCall.id}`, {
         method: 'PATCH',
@@ -1352,7 +1352,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     } catch (error) {
       console.error('End call error:', error);
     }
-    
+
     setIsCallOpen(false);
     setCurrentCall(null);
     if (socket) {
@@ -1425,7 +1425,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
             </div>
           </button>
           <div className="flex items-center space-x-1">
-            <button 
+            <button
               onClick={handleAudioCall}
               disabled={isBlocked}
               className="p-2.5 hover:bg-gray-100/80 dark:hover:bg-gray-700/80 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
@@ -1433,7 +1433,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
             >
               <Phone className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             </button>
-            <button 
+            <button
               onClick={handleVideoCall}
               disabled={isBlocked}
               className="p-2.5 hover:bg-gray-100/80 dark:hover:bg-gray-700/80 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
@@ -1442,7 +1442,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
               <Video className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             </button>
             <div className="relative">
-              <button 
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowChatMenu(!showChatMenu);
@@ -1500,14 +1500,14 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
             </div>
           </div>
         </div>
-        
+
         {/* Encryption Badge */}
         {showEncryptionBadge && (
           <div className="flex items-center justify-center mt-2">
             <div className="encrypted-badge text-xs">
               <Lock className="w-3 h-3" />
               <span>End-to-end encrypted</span>
-              <button 
+              <button
                 onClick={() => setShowEncryptionBadge(false)}
                 className="ml-1 hover:opacity-70"
               >
@@ -1561,7 +1561,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
           const isSelected = selectedMessages.has(msg.id);
           // Get reactions - prioritize state, then message reactions, then empty array
           const reactions = (messageReactions[msg.id] || msg.reactions || []).filter((r: any) => r && r.emoji);
-          
+
           return (
             <div
               key={msg.id}
@@ -1581,21 +1581,19 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
               }}
             >
               <div
-                className={`relative max-w-xs lg:max-w-md rounded-3xl overflow-hidden cursor-pointer transition-all duration-200 ${
-                  isOwn
+                className={`relative max-w-xs lg:max-w-md rounded-3xl overflow-hidden cursor-pointer transition-all duration-200 ${isOwn
                     ? 'message-own'
                     : 'message-other'
-                } ${
-                  isSelected ? 'ring-2 ring-violet-500 ring-offset-2 scale-[1.02]' : ''
-                } hover:shadow-lg`}
+                  } ${isSelected ? 'ring-2 ring-violet-500 ring-offset-2 scale-[1.02]' : ''
+                  } hover:shadow-lg`}
               >
                 {isImage && (
                   <div className="relative w-full max-w-sm">
                     <Image
-                      src={msg.ipfs_hash 
-                        ? `https://gateway.pinata.cloud/ipfs/${msg.ipfs_hash}` 
-                        : msg.content?.startsWith('http') 
-                          ? msg.content 
+                      src={msg.ipfs_hash
+                        ? `https://gateway.pinata.cloud/ipfs/${msg.ipfs_hash}`
+                        : msg.content?.startsWith('http')
+                          ? msg.content
                           : msg.content?.startsWith('ipfs://')
                             ? `https://gateway.pinata.cloud/ipfs/${msg.content.replace('ipfs://', '')}`
                             : msg.content || ''}
@@ -1617,10 +1615,10 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                 {isVideo && (
                   <div className="relative w-full">
                     <video
-                      src={msg.ipfs_hash 
-                        ? `https://gateway.pinata.cloud/ipfs/${msg.ipfs_hash}` 
-                        : msg.content?.startsWith('http') 
-                          ? msg.content 
+                      src={msg.ipfs_hash
+                        ? `https://gateway.pinata.cloud/ipfs/${msg.ipfs_hash}`
+                        : msg.content?.startsWith('http')
+                          ? msg.content
                           : msg.content?.startsWith('ipfs://')
                             ? `https://gateway.pinata.cloud/ipfs/${msg.content.replace('ipfs://', '')}`
                             : msg.content || ''}
@@ -1632,9 +1630,9 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                 )}
                 {isAudio && (
                   <div className="p-4">
-                    <audio 
-                      controls 
-                      className="w-full max-w-sm" 
+                    <audio
+                      controls
+                      className="w-full max-w-sm"
                       preload="metadata"
                       key={msg.id} // Force re-render on message change
                     >
@@ -1655,7 +1653,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                             audioUrl = `https://gateway.pinata.cloud/ipfs/${msg.content}`;
                           }
                         }
-                        
+
                         return audioUrl ? (
                           <>
                             <source src={audioUrl} type="audio/webm" />
@@ -1694,7 +1692,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                 {msg.message_type === 'text' && !isImage && !isVideo && !isFile && !isAudio && (
                   <p className="text-sm px-4 py-3 whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
                 )}
-                
+
                 {/* Reactions */}
                 {reactions && reactions.length > 0 && (
                   <div className={`px-3 pb-2 flex flex-wrap gap-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
@@ -1713,11 +1711,10 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                           e.stopPropagation();
                           if (!isSelectMode) handleReaction(msg.id, emoji);
                         }}
-                        className={`px-2.5 py-1 rounded-full text-xs flex items-center space-x-1 transition-all hover:scale-110 active:scale-95 ${
-                          isOwn
+                        className={`px-2.5 py-1 rounded-full text-xs flex items-center space-x-1 transition-all hover:scale-110 active:scale-95 ${isOwn
                             ? 'bg-white/20 hover:bg-white/30 text-white'
                             : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
-                        }`}
+                          }`}
                         disabled={isSelectMode}
                         title={`${reactionList.length} reaction${reactionList.length > 1 ? 's' : ''}`}
                       >
@@ -1727,7 +1724,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                     ))}
                   </div>
                 )}
-                
+
                 <div className={`flex items-center justify-between gap-2 px-4 pb-3 ${isImage || isVideo || isFile || isAudio ? 'pt-2' : ''}`}>
                   <div className="flex items-center gap-1">
                     {!isSelectMode && (
@@ -1737,22 +1734,21 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                             e.stopPropagation();
                             setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id);
                           }}
-                          className={`p-1.5 rounded-full transition-all hover:scale-110 ${
-                            isOwn
+                          className={`p-1.5 rounded-full transition-all hover:scale-110 ${isOwn
                               ? 'hover:bg-white/20 text-white/80'
                               : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'
-                          }`}
+                            }`}
                           title="Add reaction"
                         >
                           <Smile className="w-4 h-4" />
                         </button>
-                        
+
                         {/* Reaction Picker */}
                         {showReactionPicker === msg.id && (
                           <>
-                            <div 
-                              className="fixed inset-0 z-40" 
-                              onClick={() => setShowReactionPicker(null)} 
+                            <div
+                              className="fixed inset-0 z-40"
+                              onClick={() => setShowReactionPicker(null)}
                             />
                             <div className={`absolute bottom-full mb-2 glass-card rounded-2xl p-2 flex gap-1 z-50 animate-pop-in ${isOwn ? 'right-0' : 'left-0'}`}>
                               {['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '👏'].map((emoji) => (
@@ -1775,9 +1771,8 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <p
-                      className={`text-[10px] ${
-                        isOwn ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'
-                      }`}
+                      className={`text-[10px] ${isOwn ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'
+                        }`}
                     >
                       {formatMessageTime(msg.created_at)}
                     </p>
@@ -1835,7 +1830,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
             onChange={handleCameraFileSelect}
             className="hidden"
           />
-          
+
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -1852,7 +1847,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
             onChange={handleFileSelect}
             className="hidden"
           />
-          
+
           {!isRecording ? (
             <button
               type="button"
@@ -1874,7 +1869,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
               <Square className="w-5 h-5 text-red-600 dark:text-red-400" />
             </button>
           )}
-          
+
           <input
             type="text"
             value={message}
@@ -1883,9 +1878,9 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
             disabled={isBlocked || isRecording}
             className="flex-1 px-5 py-3 bg-gray-100/80 dark:bg-gray-800/80 rounded-2xl text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:bg-white dark:focus:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           />
-          
+
           {!isRecording && <EmojiPicker onSelect={handleEmojiSelect} />}
-          
+
           {!isRecording && (
             <button
               type="submit"

@@ -228,12 +228,12 @@ export default function StatusTab() {
   // Group statuses by user
   const storiesByUser = useMemo(() => {
     const grouped: Record<string, any[]> = {};
-    
+
     // Add my status if exists
     if (myStatus) {
       grouped['me'] = [myStatus];
     }
-    
+
     // Group other statuses by user
     statuses.forEach((status) => {
       const userId = status.user_id;
@@ -242,7 +242,7 @@ export default function StatusTab() {
       }
       grouped[userId].push(status);
     });
-    
+
     return grouped;
   }, [statuses, myStatus]);
 
@@ -291,16 +291,15 @@ export default function StatusTab() {
               onClick={() => myStatus ? handleStoryClick('me') : setShowCreateModal(true)}
               className="relative group"
             >
-              <div className={`relative w-20 h-20 rounded-full overflow-hidden border-4 ${
-                myStatus 
-                  ? 'border-violet-500 dark:border-violet-400' 
+              <div className={`relative w-20 h-20 rounded-full overflow-hidden border-4 ${myStatus
+                  ? 'border-violet-500 dark:border-violet-400'
                   : 'border-gray-300 dark:border-gray-600 border-dashed'
-              } transition-all hover:scale-105`}>
+                } transition-all hover:scale-105`}>
                 {myStatus ? (
                   <>
-                    {(user as any)?.profile_picture || user.profilePicture ? (
+                    {(user as any)?.profile_picture || (user as any)?.profilePicture ? (
                       <Image
-                        src={(user as any)?.profile_picture || user.profilePicture || ''}
+                        src={(user as any)?.profile_picture || (user as any)?.profilePicture || ''}
                         alt="My Status"
                         fill
                         className="object-cover"
@@ -308,7 +307,7 @@ export default function StatusTab() {
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
                         <span className="text-white font-bold text-xl">
-                          {user?.username?.[0]?.toUpperCase() || user?.walletAddress?.[2]?.toUpperCase() || 'U'}
+                          {(user as any)?.username?.[0]?.toUpperCase() || (user as any)?.walletAddress?.[2]?.toUpperCase() || 'U'}
                         </span>
                       </div>
                     )}
@@ -334,18 +333,17 @@ export default function StatusTab() {
             .map(([userId, userStories]) => {
               const storyUser = userStories[0]?.user;
               const hasUnviewed = userStories.some((s) => !viewedStories.has(s.id));
-              
+
               return (
                 <div key={userId} className="flex-shrink-0">
                   <button
                     onClick={() => handleStoryClick(userId)}
                     className="relative group"
                   >
-                    <div className={`relative w-20 h-20 rounded-full overflow-hidden border-4 transition-all hover:scale-105 ${
-                      hasUnviewed 
-                        ? 'border-violet-500 dark:border-violet-400' 
+                    <div className={`relative w-20 h-20 rounded-full overflow-hidden border-4 transition-all hover:scale-105 ${hasUnviewed
+                        ? 'border-violet-500 dark:border-violet-400'
                         : 'border-gray-300 dark:border-gray-600'
-                    }`}>
+                      }`}>
                       {storyUser?.profile_picture ? (
                         <Image
                           src={storyUser.profile_picture}
