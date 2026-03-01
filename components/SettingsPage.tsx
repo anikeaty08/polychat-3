@@ -13,6 +13,7 @@ import { formatAddress } from '@/lib/polygon';
 import { getTheme, setTheme } from '@/lib/theme';
 import toast from 'react-hot-toast';
 import Image from 'next/image';
+import OnChainCoreStatus from '@/components/OnChainCoreStatus';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -33,19 +34,6 @@ export default function SettingsPage() {
   const [incognitoMode, setIncognitoMode] = useState(false);
   const [blockScreenshots, setBlockScreenshots] = useState(false);
   const [encryptedBackup, setEncryptedBackup] = useState(true);
-
-  const paymentEscrowAddress = process.env.NEXT_PUBLIC_PAYMENT_ESCROW_ADDRESS;
-  const userRegistryAddress = process.env.NEXT_PUBLIC_USER_REGISTRY_ADDRESS;
-  const messagingContractAddress = process.env.NEXT_PUBLIC_MESSAGING_CONTRACT_ADDRESS;
-  const callsContractAddress = process.env.NEXT_PUBLIC_CALLS_CONTRACT_ADDRESS;
-  const statusContractAddress = process.env.NEXT_PUBLIC_STATUS_CONTRACT_ADDRESS;
-
-  const allContractsConfigured =
-    !!paymentEscrowAddress &&
-    !!userRegistryAddress &&
-    !!messagingContractAddress &&
-    !!callsContractAddress &&
-    !!statusContractAddress;
 
   useEffect(() => {
     setDarkMode(getTheme() === 'dark');
