@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB } from '@/lib/db';
+import { User } from '@/lib/models';
 import { usernameSchema } from '@/lib/validators';
 
 export async function GET(req: NextRequest) {
@@ -15,24 +16,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ available: false });
     }
 
-    // Check if username exists - use maybeSingle() to avoid error when not found
-    const { data, error } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('username', username.toLowerCase())
-      .maybeSingle();
+    await connectDB();
 
-    // If error exists and it's not a "not found" error, username is not available
-    if (error && error.code !== 'PGRST116') {
-      console.error('Username check error:', error);
-      return NextResponse.json({ available: false });
-    }
+    const existing = await User.findOne({ username: username.toLowerCase() });
 
-    // If data exists, username is taken. If data is null, username is available
-    return NextResponse.json({ available: !data });
+    return NextResponse.json({ available: !existing });
   } catch (error) {
     console.error('Username check exception:', error);
     return NextResponse.json({ available: false });
   }
 }
-

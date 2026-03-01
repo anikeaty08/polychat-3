@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { Call, ConversationParticipant, User } from '@/lib/models';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,13 +28,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify user is participant
-    const { data: participant } = await supabaseAdmin
-      .from('conversation_participants')
-      .select('conversation_id')
-      .eq('conversation_id', conversationId)
-      .eq('user_id', payload.userId)
-      .single();
+    await connectDB();
+
+    const participant = await ConversationParticipant.findOne({
+      conversation_id: conversationId,
+      user_id: payload.userId,
+    });
 
     if (!participant) {
       return NextResponse.json(
@@ -42,30 +42,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create call record
-    const { data: call, error: callError } = await supabaseAdmin
-      .from('calls')
-      .insert({
-        conversation_id: conversationId,
-        caller_id: payload.userId,
-        receiver_id: receiverId,
-        call_type: callType,
-        status: 'initiated',
-      })
-      .select()
-      .single();
+    const call = await Call.create({
+      conversation_id: conversationId,
+      caller_id: payload.userId,
+      receiver_id: receiverId,
+      call_type: callType,
+      status: 'initiated',
+    });
 
-    if (callError) {
-      throw callError;
-    }
+    await User.findByIdAndUpdate(payload.userId, {
+      last_seen: new Date(),
+      is_online: true,
+    });
 
-    // Update user's last_seen
-    await supabaseAdmin
-      .from('users')
-      .update({ last_seen: new Date().toISOString(), is_online: true })
-      .eq('id', payload.userId);
-
-    return NextResponse.json({ call });
+    const c = toApi(call)!;
+    return NextResponse.json({ call: c });
   } catch (error: any) {
     console.error('Create call error:', error);
     return NextResponse.json(
@@ -74,6 +65,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-
-

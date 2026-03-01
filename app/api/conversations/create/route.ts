@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { Conversation, ConversationParticipant } from '@/lib/models';
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,55 +21,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if conversation already exists
-    const { data: existingConvs } = await supabaseAdmin
-      .from('conversation_participants')
-      .select('conversation_id')
-      .eq('user_id', payload.userId);
+    await connectDB();
 
-    const existingConvIds = existingConvs?.map((c) => c.conversation_id) || [];
+    const existingParticipations = await ConversationParticipant.find({
+      user_id: payload.userId,
+    }).distinct('conversation_id');
 
-    if (existingConvIds.length > 0) {
-      const { data: existingConv } = await supabaseAdmin
-        .from('conversation_participants')
-        .select('conversation_id')
-        .eq('user_id', userId)
-        .in('conversation_id', existingConvIds)
-        .single();
+    if (existingParticipations.length > 0) {
+      const existingWithOther = await ConversationParticipant.findOne({
+        user_id: userId,
+        conversation_id: { $in: existingParticipations },
+      });
 
-      if (existingConv) {
-        const { data: conv } = await supabaseAdmin
-          .from('conversations')
-          .select('*')
-          .eq('id', existingConv.conversation_id)
-          .single();
-
+      if (existingWithOther) {
+        const conv = await Conversation.findById(existingWithOther.conversation_id);
         if (conv) {
-          return NextResponse.json({ conversation: conv });
+          const c = toApi(conv)!;
+          return NextResponse.json({ conversation: c });
         }
       }
     }
 
-    // Create new conversation
-    const { data: newConversation, error: convError } = await supabaseAdmin
-      .from('conversations')
-      .insert({
-        type: 'direct',
-      })
-      .select()
-      .single();
+    const newConversation = await Conversation.create({ type: 'direct' });
 
-    if (convError) {
-      throw convError;
-    }
-
-    // Add participants
-    await supabaseAdmin.from('conversation_participants').insert([
-      { conversation_id: newConversation.id, user_id: payload.userId },
-      { conversation_id: newConversation.id, user_id: userId },
+    await ConversationParticipant.insertMany([
+      { conversation_id: newConversation._id, user_id: payload.userId },
+      { conversation_id: newConversation._id, user_id: userId },
     ]);
 
-    return NextResponse.json({ conversation: newConversation });
+    const c = toApi(newConversation)!;
+    return NextResponse.json({ conversation: c });
   } catch (error: any) {
     console.error('Create conversation error:', error);
     return NextResponse.json(
@@ -77,6 +59,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-
-

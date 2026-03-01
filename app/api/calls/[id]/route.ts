@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { Call, User } from '@/lib/models';
 
 export async function PATCH(
   req: NextRequest,
@@ -23,60 +24,52 @@ export async function PATCH(
       );
     }
 
-    // Get call
-    const { data: call, error: callError } = await supabaseAdmin
-      .from('calls')
-      .select('*')
-      .eq('id', params.id)
-      .single();
+    await connectDB();
 
-    if (callError || !call) {
+    const call = await Call.findById(params.id);
+    if (!call) {
       return NextResponse.json(
         { error: 'Call not found' },
         { status: 404 }
       );
     }
 
-    // Verify user is caller or receiver
-    if (call.caller_id !== payload.userId && call.receiver_id !== payload.userId) {
+    if (
+      String(call.caller_id) !== payload.userId &&
+      String(call.receiver_id) !== payload.userId
+    ) {
       return NextResponse.json(
         { error: 'Access denied' },
         { status: 403 }
       );
     }
 
-    const updateData: any = { status };
+    const updateData: Record<string, unknown> = { status };
 
     if (status === 'answered') {
-      updateData.started_at = new Date().toISOString();
+      updateData.started_at = new Date();
     }
 
-    if (status === 'completed' || status === 'missed' || status === 'declined' || status === 'cancelled') {
-      updateData.ended_at = new Date().toISOString();
-      if (duration) {
-        updateData.duration = duration;
-      }
+    if (
+      ['completed', 'missed', 'declined', 'cancelled'].includes(status)
+    ) {
+      updateData.ended_at = new Date();
+      if (duration) updateData.duration = duration;
     }
 
-    // Update call
-    const { data: updatedCall, error: updateError } = await supabaseAdmin
-      .from('calls')
-      .update(updateData)
-      .eq('id', params.id)
-      .select()
-      .single();
+    const updatedCall = await Call.findByIdAndUpdate(
+      params.id,
+      updateData,
+      { new: true }
+    );
 
-    if (updateError) {
-      throw updateError;
-    }
+    await User.findByIdAndUpdate(payload.userId, {
+      last_seen: new Date(),
+      is_online: true,
+    });
 
-    // Update user's last_seen
-    await supabaseAdmin
-      .from('users')
-      .update({ last_seen: new Date().toISOString(), is_online: true })
-      .eq('id', payload.userId);
-
-    return NextResponse.json({ call: updatedCall });
+    const c = toApi(updatedCall)!;
+    return NextResponse.json({ call: c });
   } catch (error: any) {
     console.error('Update call error:', error);
     return NextResponse.json(
@@ -85,6 +78,3 @@ export async function PATCH(
     );
   }
 }
-
-
-

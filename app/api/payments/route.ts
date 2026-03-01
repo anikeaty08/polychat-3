@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB } from '@/lib/db';
+import { Payment } from '@/lib/models';
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,20 +12,19 @@ export async function GET(req: NextRequest) {
     }
 
     const payload = verifyToken(token);
+    await connectDB();
 
-    // Get user's payments
-    const { data: payments, error } = await supabaseAdmin
-      .from('payments')
-      .select('*')
-      .eq('user_id', payload.userId)
-      .order('created_at', { ascending: false })
-      .limit(50);
+    const payments = await Payment.find({ user_id: payload.userId })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
 
-    if (error) {
-      throw error;
-    }
+    const mapped = payments.map((p: any) => ({
+      ...p,
+      id: String(p._id),
+    }));
 
-    return NextResponse.json({ payments: payments || [] });
+    return NextResponse.json({ payments: mapped });
   } catch (error: any) {
     console.error('Get payments error:', error);
     return NextResponse.json(
@@ -33,6 +33,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-
-
-

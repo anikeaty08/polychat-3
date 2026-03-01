@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { Contact } from '@/lib/models';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,13 +28,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if already a contact
-    const { data: existing } = await supabaseAdmin
-      .from('contacts')
-      .select('id')
-      .eq('user_id', payload.userId)
-      .eq('contact_id', contactId)
-      .maybeSingle();
+    await connectDB();
+
+    const existing = await Contact.findOne({
+      user_id: payload.userId,
+      contact_id: contactId,
+    });
 
     if (existing) {
       return NextResponse.json(
@@ -42,21 +42,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Add contact
-    const { data, error } = await supabaseAdmin
-      .from('contacts')
-      .insert({
-        user_id: payload.userId,
-        contact_id: contactId,
-      })
-      .select()
-      .single();
+    const contact = await Contact.create({
+      user_id: payload.userId,
+      contact_id: contactId,
+    });
 
-    if (error) {
-      throw error;
-    }
-
-    return NextResponse.json({ success: true, contact: data });
+    const c = toApi(contact)!;
+    return NextResponse.json({ success: true, contact: c });
   } catch (error: any) {
     console.error('Add contact error:', error);
     return NextResponse.json(
@@ -85,15 +77,12 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const { error } = await supabaseAdmin
-      .from('contacts')
-      .delete()
-      .eq('user_id', payload.userId)
-      .eq('contact_id', contactId);
+    await connectDB();
 
-    if (error) {
-      throw error;
-    }
+    await Contact.deleteOne({
+      user_id: payload.userId,
+      contact_id: contactId,
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -104,6 +93,3 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
-
-
-

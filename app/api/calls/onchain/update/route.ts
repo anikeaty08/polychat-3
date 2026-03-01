@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { Call } from '@/lib/models';
 import { getCallsContract } from '@/lib/contracts';
 import { ethers } from 'ethers';
 
@@ -22,11 +23,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify transaction on-chain
     const provider = new ethers.JsonRpcProvider(
       process.env.NEXT_PUBLIC_POLYGON_AMOY_RPC
     );
-    
+
     try {
       const tx = await provider.getTransaction(transactionHash);
       if (!tx) {
@@ -44,13 +44,9 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Get call from database
-      const { data: call } = await supabaseAdmin
-        .from('calls')
-        .select('*')
-        .eq('id', callId)
-        .single();
+      await connectDB();
 
+      const call = await Call.findById(callId);
       if (!call) {
         return NextResponse.json(
           { error: 'Call not found' },
@@ -58,27 +54,22 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Update call status in database
-      const { data: updatedCall, error: updateError } = await supabaseAdmin
-        .from('calls')
-        .update({
-          status,
-          transaction_hash: transactionHash,
-          on_chain: true,
-          ...(status === 'answered' && { started_at: new Date().toISOString() }),
-          ...((status === 'completed' || status === 'missed' || status === 'declined') && {
-            ended_at: new Date().toISOString(),
-          }),
-        })
-        .eq('id', callId)
-        .select()
-        .single();
-
-      if (updateError) {
-        throw updateError;
+      const updateData: Record<string, unknown> = {
+        status,
+        transaction_hash: transactionHash,
+        on_chain: true,
+      };
+      if (status === 'answered') updateData.started_at = new Date();
+      if (['completed', 'missed', 'declined'].includes(status)) {
+        updateData.ended_at = new Date();
       }
 
-      return NextResponse.json({ call: updatedCall });
+      const updatedCall = await Call.findByIdAndUpdate(callId, updateData, {
+        new: true,
+      });
+
+      const c = toApi(updatedCall)!;
+      return NextResponse.json({ call: c });
     } catch (error: any) {
       console.error('On-chain call update error:', error);
       return NextResponse.json(
@@ -94,6 +85,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-
-

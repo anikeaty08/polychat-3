@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB } from '@/lib/db';
+import { Report } from '@/lib/models';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,13 +28,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if already reported
-    const { data: existing } = await supabaseAdmin
-      .from('reports')
-      .select('id')
-      .eq('reporter_id', payload.userId)
-      .eq('reported_id', userId)
-      .maybeSingle();
+    await connectDB();
+
+    const existing = await Report.findOne({
+      reporter_id: payload.userId,
+      reported_id: userId,
+    });
 
     if (existing) {
       return NextResponse.json(
@@ -42,16 +42,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create report (assuming reports table exists, if not we'll need to add it to schema)
-    // For now, we'll just log it or store in a simple way
-    // You may want to create a reports table in Supabase
-    
-    // Since reports table might not exist, we'll return success
-    // In production, you'd want to store this in a reports table
-    
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Report submitted successfully. Our team will review it.' 
+    await Report.create({
+      reporter_id: payload.userId,
+      reported_id: userId,
+      reason,
+      description,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Report submitted successfully. Our team will review it.',
     });
   } catch (error: any) {
     console.error('Report user error:', error);
@@ -61,6 +61,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-
-

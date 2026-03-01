@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Supabase-Database-3FCF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase" />
+  <img src="https://img.shields.io/badge/MongoDB-Database-47A248?style=flat-square&logo=mongodb&logoColor=white" alt="MongoDB" />
   <img src="https://img.shields.io/badge/IPFS-Storage-65C2CB?style=flat-square&logo=ipfs&logoColor=white" alt="IPFS" />
   <img src="https://img.shields.io/badge/Socket.io-Realtime-010101?style=flat-square&logo=socket.io&logoColor=white" alt="Socket.io" />
   <img src="https://img.shields.io/badge/Hardhat-Contracts-FFF100?style=flat-square&logo=hardhat&logoColor=black" alt="Hardhat" />
@@ -101,7 +101,7 @@
 |----------|-------------|
 | **Frontend** | Next.js 14, React 18, TypeScript, Tailwind CSS, Framer Motion |
 | **Backend** | Next.js API Routes, Socket.io, Node.js |
-| **Database** | Supabase (PostgreSQL) |
+| **Database** | MongoDB (Mongoose) |
 | **Storage** | Pinata IPFS |
 | **Blockchain** | Polygon Amoy, Ethers.js, Hardhat |
 | **Encryption** | TweetNaCl.js |
@@ -115,7 +115,7 @@
 
 - Node.js 18+
 - MetaMask or Web3 wallet
-- Supabase account
+- MongoDB (local or Atlas)
 - Pinata account
 
 ### Installation
@@ -137,9 +137,9 @@ npm run dev
 
 ### Environment Setup
 
-1. **Supabase** - Create project at [supabase.com](https://supabase.com)
+1. **MongoDB** - Use [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) or local MongoDB
 2. **Pinata** - Get API keys at [pinata.cloud](https://pinata.cloud)
-3. **Configure `.env`** with your credentials
+3. **Configure `.env`** with your credentials (set `MONGODB_URI`)
 
 ### Environment Variables (Important)
 
@@ -219,7 +219,7 @@ Make sure these values are set correctly in `.env` before running the app in pro
 - ✅ Server-side signature verification
 - ✅ End-to-end encryption
 - ✅ HTTPS in production
-- ✅ Row Level Security (Supabase)
+- ✅ Protected API routes (auth required)
 - ✅ Private key protection
 
 ---

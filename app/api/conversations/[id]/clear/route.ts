@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB } from '@/lib/db';
+import { ConversationParticipant, Message } from '@/lib/models';
 
 export async function DELETE(
   req: NextRequest,
@@ -15,14 +16,12 @@ export async function DELETE(
 
     const payload = verifyToken(token);
     const conversationId = params.id;
+    await connectDB();
 
-    // Verify user is participant
-    const { data: participant } = await supabaseAdmin
-      .from('conversation_participants')
-      .select('conversation_id')
-      .eq('conversation_id', conversationId)
-      .eq('user_id', payload.userId)
-      .single();
+    const participant = await ConversationParticipant.findOne({
+      conversation_id: conversationId,
+      user_id: payload.userId,
+    });
 
     if (!participant) {
       return NextResponse.json(
@@ -31,15 +30,7 @@ export async function DELETE(
       );
     }
 
-    // Delete all messages in conversation
-    const { error: deleteError } = await supabaseAdmin
-      .from('messages')
-      .delete()
-      .eq('conversation_id', conversationId);
-
-    if (deleteError) {
-      throw deleteError;
-    }
+    await Message.deleteMany({ conversation_id: conversationId });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -50,6 +41,3 @@ export async function DELETE(
     );
   }
 }
-
-
-

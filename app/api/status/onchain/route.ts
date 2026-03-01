@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
-import { getStatusContract } from '@/lib/contracts';
+import { connectDB, toApi } from '@/lib/db';
+import { Status, User } from '@/lib/models';
 import { ethers } from 'ethers';
 
 export async function POST(req: NextRequest) {
@@ -22,11 +22,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify transaction on-chain
     const provider = new ethers.JsonRpcProvider(
       process.env.NEXT_PUBLIC_POLYGON_AMOY_RPC
     );
-    
+
     try {
       const tx = await provider.getTransaction(transaction_hash);
       if (!tx) {
@@ -44,43 +43,36 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Get user wallet address
-      const { data: user } = await supabaseAdmin
-        .from('users')
-        .select('wallet_address')
-        .eq('id', payload.userId)
-        .single();
+      await connectDB();
 
-      if (!user || user.wallet_address.toLowerCase() !== tx.from?.toLowerCase()) {
+      const user = await User.findById(payload.userId).select('wallet_address');
+      if (
+        !user ||
+        user.wallet_address.toLowerCase() !== tx.from?.toLowerCase()
+      ) {
         return NextResponse.json(
           { error: 'Wallet address mismatch' },
           { status: 403 }
         );
       }
 
-      // Create status in database
-      const imageUrl = image_ipfs_hash ? `https://gateway.pinata.cloud/ipfs/${image_ipfs_hash}` : null;
+      const imageUrl = image_ipfs_hash
+        ? `https://gateway.pinata.cloud/ipfs/${image_ipfs_hash}`
+        : null;
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24);
 
-      const { data: status, error: statusError } = await supabaseAdmin
-        .from('statuses')
-        .insert({
-          user_id: payload.userId,
-          text: text || null,
-          image_url: imageUrl,
-          transaction_hash: transaction_hash,
-          on_chain: true,
-          expires_at: expiresAt.toISOString(),
-        })
-        .select()
-        .single();
+      const status = await Status.create({
+        user_id: payload.userId,
+        text: text || null,
+        image_url: imageUrl,
+        transaction_hash: transaction_hash,
+        on_chain: true,
+        expires_at: expiresAt,
+      });
 
-      if (statusError) {
-        throw statusError;
-      }
-
-      return NextResponse.json({ status });
+      const s = toApi(status)!;
+      return NextResponse.json({ status: s });
     } catch (error: any) {
       console.error('On-chain status error:', error);
       return NextResponse.json(
@@ -96,4 +88,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

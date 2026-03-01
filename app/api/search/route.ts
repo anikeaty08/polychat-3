@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApiMany } from '@/lib/db';
+import { User, SearchHistory } from '@/lib/models';
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,42 +18,46 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ users: [] });
     }
 
-    // Search by username or wallet address
+    await connectDB();
+
     const isWalletAddress = query.startsWith('0x');
     const isUsername = query.startsWith('@');
-
     let searchQuery = query;
-    if (isUsername) {
-      searchQuery = query.slice(1);
-    }
+    if (isUsername) searchQuery = query.slice(1);
 
-    let usersQuery = supabaseAdmin
-      .from('users')
-      .select('id, username, display_name, profile_picture, wallet_address, is_online, last_seen')
-      .neq('id', payload.userId)
-      .limit(20);
-
+    const filter: Record<string, unknown> = { _id: { $ne: payload.userId } };
     if (isWalletAddress) {
-      usersQuery = usersQuery.ilike('wallet_address', `%${searchQuery}%`);
+      filter.wallet_address = new RegExp(searchQuery, 'i');
     } else {
-      usersQuery = usersQuery.or(`username.ilike.%${searchQuery}%,display_name.ilike.%${searchQuery}%`);
+      filter.$or = [
+        { username: new RegExp(searchQuery, 'i') },
+        { display_name: new RegExp(searchQuery, 'i') },
+      ];
     }
 
-    const { data: users, error } = await usersQuery;
+    const users = await User.find(filter)
+      .select('username display_name profile_picture wallet_address is_online last_seen')
+      .limit(20)
+      .lean();
 
-    if (error) {
-      throw error;
-    }
-
-    // Save search to history
     if (query.trim()) {
-      await supabaseAdmin.from('search_history').insert({
+      await SearchHistory.create({
         user_id: payload.userId,
         search_term: query,
       });
     }
 
-    return NextResponse.json({ users: users || [] });
+    const mapped = users.map((u: any) => ({
+      id: String(u._id),
+      username: u.username,
+      display_name: u.display_name,
+      profile_picture: u.profile_picture,
+      wallet_address: u.wallet_address,
+      is_online: u.is_online,
+      last_seen: u.last_seen,
+    }));
+
+    return NextResponse.json({ users: mapped });
   } catch (error: any) {
     console.error('Search error:', error);
     return NextResponse.json(
@@ -61,6 +66,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-
-
-

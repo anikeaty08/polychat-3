@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import {
+  ConversationParticipant,
+  Contact,
+  Status,
+  User,
+} from '@/lib/models';
 import { getStatusContract } from '@/lib/contracts';
 import { ethers } from 'ethers';
 
@@ -13,153 +19,155 @@ export async function GET(req: NextRequest) {
     }
 
     const payload = verifyToken(token);
+    await connectDB();
 
-    // Get users you chat with (from conversations)
-    const { data: participants } = await supabaseAdmin
-      .from('conversation_participants')
-      .select('conversation_id')
-      .eq('user_id', payload.userId);
+    const participants = await ConversationParticipant.find({
+      user_id: payload.userId,
+    }).distinct('conversation_id');
 
-    const conversationIds = participants?.map((p) => p.conversation_id) || [];
-
-    // Get all participants from these conversations (excluding self)
     let chatUserIds: string[] = [];
-    if (conversationIds.length > 0) {
-      const { data: allParticipants } = await supabaseAdmin
-        .from('conversation_participants')
-        .select('user_id')
-        .in('conversation_id', conversationIds)
-        .neq('user_id', payload.userId);
-
-      chatUserIds = [...new Set(allParticipants?.map((p) => p.user_id) || [])];
+    if (participants.length > 0) {
+      const allParticipants = await ConversationParticipant.find({
+        conversation_id: { $in: participants },
+        user_id: { $ne: payload.userId },
+      }).distinct('user_id');
+      chatUserIds = allParticipants.map(String);
     }
 
-    // Also include contacts
-    const { data: contacts } = await supabaseAdmin
-      .from('contacts')
-      .select('contact_id')
-      .eq('user_id', payload.userId);
+    const contacts = await Contact.find({ user_id: payload.userId }).distinct(
+      'contact_id'
+    );
+    const contactIds = contacts.map(String);
+    const allUserIds = [
+      ...new Set([...chatUserIds, ...contactIds, payload.userId]),
+    ];
 
-    const contactIds = contacts?.map((c) => c.contact_id) || [];
-    const allUserIds = [...new Set([...chatUserIds, ...contactIds, payload.userId])];
-
-    // Get statuses from database (only non-expired)
     const now = new Date();
 
-    const { data: statuses, error } = await supabaseAdmin
-      .from('statuses')
-      .select(`
-        *,
-        user:users(id, username, display_name, profile_picture, wallet_address)
-      `)
-      .in('user_id', allUserIds.length > 0 ? allUserIds : [payload.userId])
-      .gte('expires_at', now.toISOString()) // Only get non-expired statuses
-      .order('created_at', { ascending: false });
+    const statuses = await Status.find({
+      user_id: { $in: allUserIds.length > 0 ? allUserIds : [payload.userId] },
+      expires_at: { $gte: now },
+    })
+      .populate('user_id', 'username display_name profile_picture wallet_address')
+      .sort({ createdAt: -1 })
+      .lean();
 
-    if (error) {
-      throw error;
-    }
+    let statusList = statuses.map((s: any) => ({
+      ...s,
+      id: String(s._id),
+      user: s.user_id
+        ? {
+            id: String(s.user_id._id),
+            username: s.user_id.username,
+            display_name: s.user_id.display_name,
+            profile_picture: s.user_id.profile_picture,
+            wallet_address: s.user_id.wallet_address,
+          }
+        : null,
+    }));
 
-    // Try to fetch on-chain statuses if contract is configured
     try {
       const provider = new ethers.JsonRpcProvider(
         process.env.NEXT_PUBLIC_POLYGON_AMOY_RPC
       );
       const statusContract = getStatusContract(provider);
 
-      // Get user's wallet address
-      const { data: currentUser } = await supabaseAdmin
-        .from('users')
-        .select('wallet_address')
-        .eq('id', payload.userId)
-        .single();
+      const currentUser = await User.findById(payload.userId).select(
+        'wallet_address'
+      );
 
       if (currentUser?.wallet_address) {
-        // Get user's on-chain status
-        const onChainStatus = await statusContract.getLatestStatus(currentUser.wallet_address);
+        const onChainStatus = await statusContract.getLatestStatus(
+          currentUser.wallet_address
+        );
         if (onChainStatus.exists) {
-          // Merge with database status
+          // Merge logic if needed
         }
       }
 
-      // Get contacts' on-chain statuses
       if (contactIds.length > 0) {
-        const { data: contactUsers } = await supabaseAdmin
-          .from('users')
-          .select('id, wallet_address')
-          .in('id', contactIds);
+        const contactUsers = await User.find({
+          _id: { $in: contactIds },
+        }).select('username display_name profile_picture wallet_address');
 
         const currentTimestamp = Math.floor(Date.now() / 1000);
 
-        for (const contact of contactUsers || []) {
+        for (const contact of contactUsers) {
           if (contact.wallet_address) {
             try {
-              const onChainStatus = await statusContract.getLatestStatus(contact.wallet_address);
+              const onChainStatus = await statusContract.getLatestStatus(
+                contact.wallet_address
+              );
               if (onChainStatus.exists) {
-                // Check if status is expired
                 const expiresAt = Number(onChainStatus.expiresAt);
-                if (expiresAt <= currentTimestamp) {
-                  // Status expired, skip it
-                  continue;
-                }
+                if (expiresAt <= currentTimestamp) continue;
 
-                // Check if already in statuses array
-                const exists = statuses?.some((s: any) => 
-                  s.user_id === contact.id && s.on_chain && s.transaction_hash
+                const exists = statusList.some(
+                  (s: any) =>
+                    String(s.user_id) === String(contact._id) &&
+                    s.on_chain &&
+                    s.transaction_hash
                 );
-                
-                if (!exists) {
-                  // Add on-chain status to results
-                  const { data: contactProfile } = await supabaseAdmin
-                    .from('users')
-                    .select('id, username, display_name, profile_picture')
-                    .eq('id', contact.id)
-                    .single();
 
-                  if (contactProfile) {
-                    statuses?.push({
-                      id: `onchain-${contact.id}`,
-                      user_id: contact.id,
-                      text: onChainStatus.text,
-                      image_url: onChainStatus.imageIpfsHash 
-                        ? `https://gateway.pinata.cloud/ipfs/${onChainStatus.imageIpfsHash}` 
-                        : null,
-                      on_chain: true,
-                      created_at: new Date(Number(onChainStatus.timestamp) * 1000).toISOString(),
-                      expires_at: new Date(expiresAt * 1000).toISOString(),
-                      user: contactProfile,
-                    });
-                  }
+                if (!exists) {
+                  statusList.push({
+                    id: `onchain-${contact._id}`,
+                    user_id: String(contact._id),
+                    text: onChainStatus.text,
+                    image_url: onChainStatus.imageIpfsHash
+                      ? `https://gateway.pinata.cloud/ipfs/${onChainStatus.imageIpfsHash}`
+                      : null,
+                    on_chain: true,
+                    created_at: new Date(
+                      Number(onChainStatus.timestamp) * 1000
+                    ).toISOString(),
+                    expires_at: new Date(expiresAt * 1000).toISOString(),
+                    user: {
+                      id: String(contact._id),
+                      username: contact.username,
+                      display_name: contact.display_name,
+                      profile_picture: contact.profile_picture,
+                    },
+                  });
                 }
               }
             } catch (error) {
-              // Skip if contract not configured or error
               console.log('On-chain status fetch error:', error);
             }
           }
         }
       }
     } catch (error) {
-      // Contract not configured, use database only
       console.log('On-chain statuses not available, using database only');
     }
 
-    // Get user's own status (only if not expired)
-    const { data: myStatus } = await supabaseAdmin
-      .from('statuses')
-      .select(`
-        *,
-        user:users(id, username, display_name, profile_picture, wallet_address)
-      `)
-      .eq('user_id', payload.userId)
-      .gte('expires_at', now.toISOString()) // Only get non-expired status
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const myStatus = await Status.findOne({
+      user_id: payload.userId,
+      expires_at: { $gte: now },
+    })
+      .populate('user_id', 'username display_name profile_picture wallet_address')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const myStatusFormatted = myStatus
+      ? {
+          ...myStatus,
+          id: String(myStatus._id),
+          user: (myStatus as any).user_id
+            ? {
+                id: String((myStatus as any).user_id._id),
+                username: (myStatus as any).user_id.username,
+                display_name: (myStatus as any).user_id.display_name,
+                profile_picture: (myStatus as any).user_id.profile_picture,
+                wallet_address: (myStatus as any).user_id.wallet_address,
+              }
+            : null,
+        }
+      : null;
 
     return NextResponse.json({
-      statuses: statuses?.filter((s: any) => s.user_id !== payload.userId) || [],
-      myStatus: myStatus || null,
+      statuses: statusList.filter((s: any) => String(s.user_id) !== payload.userId),
+      myStatus: myStatusFormatted,
     });
   } catch (error: any) {
     console.error('Get statuses error:', error);
@@ -188,30 +196,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Delete expired statuses for this user
+    await connectDB();
+
     const now = new Date();
-    await supabaseAdmin
-      .from('statuses')
-      .delete()
-      .eq('user_id', payload.userId)
-      .lt('expires_at', now.toISOString());
+    await Status.deleteMany({
+      user_id: payload.userId,
+      expires_at: { $lt: now },
+    });
 
-    // Create new status
-    const { data: status, error } = await supabaseAdmin
-      .from('statuses')
-      .insert({
-        user_id: payload.userId,
-        text: text || null,
-        image_url: image_url || null,
-      })
-      .select()
-      .single();
+    const status = await Status.create({
+      user_id: payload.userId,
+      text: text || null,
+      image_url: image_url || null,
+    });
 
-    if (error) {
-      throw error;
-    }
-
-    return NextResponse.json({ status });
+    const s = toApi(status)!;
+    return NextResponse.json({ status: s });
   } catch (error: any) {
     console.error('Create status error:', error);
     return NextResponse.json(
@@ -220,4 +220,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

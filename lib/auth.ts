@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import jwt from 'jsonwebtoken';
-import { supabaseAdmin } from './supabase';
+import { connectDB, toApi } from './db';
+import { User, PrivacySettings } from './models';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
@@ -29,38 +30,23 @@ export async function verifyWalletSignature(
 }
 
 export async function getOrCreateUser(walletAddress: string) {
-  const { data: existingUser } = await supabaseAdmin
-    .from('users')
-    .select('*')
-    .eq('wallet_address', walletAddress.toLowerCase())
-    .maybeSingle();
+  await connectDB();
+
+  const existingUser = await User.findOne({ wallet_address: walletAddress.toLowerCase() });
 
   if (existingUser) {
-    await supabaseAdmin
-      .from('users')
-      .update({ last_seen: new Date().toISOString() })
-      .eq('id', existingUser.id);
-
-    return existingUser;
+    existingUser.last_seen = new Date();
+    await existingUser.save();
+    return toApi(existingUser)!;
   }
 
-  const { data: newUser, error } = await supabaseAdmin
-    .from('users')
-    .insert({
-      wallet_address: walletAddress.toLowerCase(),
-    })
-    .select()
-    .single();
-
-  if (error) {
-    throw new Error(`Failed to create user: ${error.message}`);
-  }
-
-  await supabaseAdmin.from('privacy_settings').insert({
-    user_id: newUser.id,
+  const newUser = await User.create({
+    wallet_address: walletAddress.toLowerCase(),
   });
 
-  return newUser;
+  await PrivacySettings.create({ user_id: newUser._id });
+
+  return toApi(newUser)!;
 }
 
 export function generateToken(payload: AuthPayload): string {
@@ -77,11 +63,8 @@ export function verifyToken(token: string): AuthPayload {
 
 export async function getUserFromToken(token: string) {
   const payload = verifyToken(token);
-  const { data: user } = await supabaseAdmin
-    .from('users')
-    .select('*')
-    .eq('id', payload.userId)
-    .single();
+  await connectDB();
 
-  return user;
+  const user = await User.findById(payload.userId);
+  return user ? toApi(user) : null;
 }

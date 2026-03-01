@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB } from '@/lib/db';
+import { Call } from '@/lib/models';
 
 export async function DELETE(req: NextRequest) {
   try {
@@ -11,16 +12,14 @@ export async function DELETE(req: NextRequest) {
     }
 
     const payload = verifyToken(token);
+    await connectDB();
 
-    // Delete all calls for the user (as caller or receiver)
-    const { error } = await supabaseAdmin
-      .from('calls')
-      .delete()
-      .or(`caller_id.eq.${payload.userId},receiver_id.eq.${payload.userId}`);
-
-    if (error) {
-      throw error;
-    }
+    await Call.deleteMany({
+      $or: [
+        { caller_id: payload.userId },
+        { receiver_id: payload.userId },
+      ],
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -31,6 +30,3 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
-
-
-

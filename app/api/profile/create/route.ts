@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { User } from '@/lib/models';
 import { uploadToPinata } from '@/lib/pinata';
 import { createProfileSchema } from '@/lib/validators';
 
@@ -31,13 +32,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if username is available (use maybeSingle to avoid error when not found)
-    const { data: existingUser } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('username', username.toLowerCase())
-      .maybeSingle();
+    await connectDB();
 
+    const existingUser = await User.findOne({ username: username.toLowerCase() });
     if (existingUser) {
       return NextResponse.json(
         { error: 'Username already taken' },
@@ -55,36 +52,34 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Update user profile
-    const { data: user, error: updateError } = await supabaseAdmin
-      .from('users')
-      .update({
+    const user = await User.findByIdAndUpdate(
+      payload.userId,
+      {
         username: username.toLowerCase(),
         display_name: displayName || null,
         status: status || null,
         profile_picture: profilePictureUrl,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', payload.userId)
-      .select()
-      .single();
+      },
+      { new: true }
+    );
 
-    if (updateError) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Failed to create profile' },
         { status: 500 }
       );
     }
 
+    const u = toApi(user)!;
     return NextResponse.json({
       success: true,
       user: {
-        id: user.id,
-        walletAddress: user.wallet_address,
-        username: user.username,
-        displayName: user.display_name,
-        profilePicture: user.profile_picture,
-        status: user.status,
+        id: u.id,
+        walletAddress: u.wallet_address,
+        username: u.username,
+        displayName: u.display_name,
+        profilePicture: u.profile_picture,
+        status: u.status,
       },
     });
   } catch (error: any) {
@@ -95,4 +90,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

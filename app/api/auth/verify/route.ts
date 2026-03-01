@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { User } from '@/lib/models';
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,28 +15,29 @@ export async function GET(req: NextRequest) {
     }
 
     const payload = verifyToken(token);
-    const { data: user, error } = await supabaseAdmin
-      .from('users')
-      .select('id, wallet_address, username, display_name, profile_picture, status, created_at')
-      .eq('id', payload.userId)
-      .single();
+    await connectDB();
 
-    if (error || !user) {
+    const user = await User.findById(payload.userId).select(
+      'wallet_address username display_name profile_picture status createdAt'
+    );
+
+    if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       );
     }
 
+    const u = toApi(user)!;
     return NextResponse.json({
       user: {
-        id: user.id,
-        walletAddress: user.wallet_address,
-        username: user.username,
-        displayName: user.display_name,
-        profilePicture: user.profile_picture,
-        status: user.status,
-        createdAt: user.created_at,
+        id: u.id,
+        walletAddress: u.wallet_address,
+        username: u.username,
+        displayName: u.display_name,
+        profilePicture: u.profile_picture,
+        status: u.status,
+        createdAt: u.createdAt,
       },
       valid: true,
     });

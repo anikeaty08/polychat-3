@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { Call } from '@/lib/models';
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,42 +14,44 @@ export async function GET(req: NextRequest) {
     const payload = verifyToken(token);
     const type = req.nextUrl.searchParams.get('type') || 'all';
 
-    let query = supabaseAdmin
-      .from('calls')
-      .select(
-        `
-        *,
-        caller:users!calls_caller_id_fkey(id, username, display_name, profile_picture),
-        receiver:users!calls_receiver_id_fkey(id, username, display_name, profile_picture)
-      `
-      )
-      .or(`caller_id.eq.${payload.userId},receiver_id.eq.${payload.userId}`)
-      .order('created_at', { ascending: false });
+    await connectDB();
 
-    if (type === 'audio') {
-      query = query.eq('call_type', 'audio');
-    } else if (type === 'video') {
-      query = query.eq('call_type', 'video');
-    } else if (type === 'missed') {
-      query = query.eq('status', 'missed');
-    }
+    const filter: Record<string, unknown> = {
+      $or: [
+        { caller_id: payload.userId },
+        { receiver_id: payload.userId },
+      ],
+    };
+    if (type === 'audio') filter.call_type = 'audio';
+    else if (type === 'video') filter.call_type = 'video';
+    else if (type === 'missed') filter.status = 'missed';
 
-    const { data: calls, error } = await query;
+    const calls = await Call.find(filter)
+      .populate('caller_id', 'username display_name profile_picture')
+      .populate('receiver_id', 'username display_name profile_picture')
+      .sort({ createdAt: -1 })
+      .lean();
 
-    if (error) {
-      throw error;
-    }
-
-    // Format calls with contact info
-    const formattedCalls = calls?.map((call) => {
-      const contact = call.caller_id === payload.userId ? call.receiver : call.caller;
+    const formattedCalls = calls.map((call: any) => {
+      const contact =
+        String(call.caller_id?._id) === payload.userId
+          ? call.receiver_id
+          : call.caller_id;
       return {
         ...call,
-        contact,
+        id: String(call._id),
+        contact: contact
+          ? {
+              id: String(contact._id),
+              username: contact.username,
+              display_name: contact.display_name,
+              profile_picture: contact.profile_picture,
+            }
+          : null,
       };
     });
 
-    return NextResponse.json({ calls: formattedCalls || [] });
+    return NextResponse.json({ calls: formattedCalls });
   } catch (error: any) {
     console.error('Get calls error:', error);
     return NextResponse.json(
@@ -57,6 +60,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-
-
-

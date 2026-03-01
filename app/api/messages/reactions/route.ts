@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { Message, ConversationParticipant, MessageReaction } from '@/lib/models';
 
-/**
- * Add or remove a reaction to a message
- * POST: { messageId, emoji } - toggle reaction
- */
 export async function POST(req: NextRequest) {
   try {
     const token = req.headers.get('authorization')?.replace('Bearer ', '');
@@ -24,13 +21,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify message exists and user has access
-    const { data: message } = await supabaseAdmin
-      .from('messages')
-      .select('id, conversation_id')
-      .eq('id', messageId)
-      .single();
+    await connectDB();
 
+    const message = await Message.findById(messageId).select('conversation_id');
     if (!message) {
       return NextResponse.json(
         { error: 'Message not found' },
@@ -38,13 +31,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify user is participant in conversation
-    const { data: participant } = await supabaseAdmin
-      .from('conversation_participants')
-      .select('conversation_id')
-      .eq('conversation_id', message.conversation_id)
-      .eq('user_id', payload.userId)
-      .single();
+    const participant = await ConversationParticipant.findOne({
+      conversation_id: message.conversation_id,
+      user_id: payload.userId,
+    });
 
     if (!participant) {
       return NextResponse.json(
@@ -53,52 +43,51 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if reaction already exists
-    const { data: existingReaction } = await supabaseAdmin
-      .from('message_reactions')
-      .select('id')
-      .eq('message_id', messageId)
-      .eq('user_id', payload.userId)
-      .eq('emoji', emoji)
-      .maybeSingle();
+    const existingReaction = await MessageReaction.findOne({
+      message_id: messageId,
+      user_id: payload.userId,
+      emoji,
+    });
 
     if (existingReaction) {
-      // Remove reaction
-      await supabaseAdmin
-        .from('message_reactions')
-        .delete()
-        .eq('id', existingReaction.id);
-
+      await MessageReaction.findByIdAndDelete(existingReaction._id);
       return NextResponse.json({
         success: true,
         action: 'removed',
         reaction: null,
       });
-    } else {
-      // Add reaction
-      const { data: reaction, error } = await supabaseAdmin
-        .from('message_reactions')
-        .insert({
-          message_id: messageId,
-          user_id: payload.userId,
-          emoji,
-        })
-        .select(`
-          *,
-          user:users(id, username, display_name, profile_picture)
-        `)
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      return NextResponse.json({
-        success: true,
-        action: 'added',
-        reaction,
-      });
     }
+
+    const reaction = await MessageReaction.create({
+      message_id: messageId,
+      user_id: payload.userId,
+      emoji,
+    });
+
+    const populated = await MessageReaction.findById(reaction._id)
+      .populate('user_id', 'username display_name profile_picture')
+      .lean();
+
+    const r = populated
+      ? {
+          ...populated,
+          id: String(populated._id),
+          user: (populated as any).user_id
+            ? {
+                id: String((populated as any).user_id._id),
+                username: (populated as any).user_id.username,
+                display_name: (populated as any).user_id.display_name,
+                profile_picture: (populated as any).user_id.profile_picture,
+              }
+            : null,
+        }
+      : toApi(reaction)!;
+
+    return NextResponse.json({
+      success: true,
+      action: 'added',
+      reaction: r,
+    });
   } catch (error: any) {
     console.error('Reaction error:', error);
     return NextResponse.json(
@@ -108,10 +97,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/**
- * Get all reactions for a message
- * GET: ?messageId=xxx
- */
 export async function GET(req: NextRequest) {
   try {
     const token = req.headers.get('authorization')?.replace('Bearer ', '');
@@ -120,7 +105,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const payload = verifyToken(token);
     const { searchParams } = new URL(req.url);
     const messageId = searchParams.get('messageId');
 
@@ -131,31 +115,35 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Get all reactions for this message
-    const { data: reactions, error } = await supabaseAdmin
-      .from('message_reactions')
-      .select(`
-        *,
-        user:users(id, username, display_name, profile_picture)
-      `)
-      .eq('message_id', messageId)
-      .order('created_at', { ascending: true });
+    await connectDB();
 
-    if (error) {
-      throw error;
-    }
+    const reactions = await MessageReaction.find({ message_id: messageId })
+      .populate('user_id', 'username display_name profile_picture')
+      .sort({ createdAt: 1 })
+      .lean();
 
-    // Group reactions by emoji
     const groupedReactions: Record<string, any[]> = {};
-    reactions?.forEach((reaction) => {
-      if (!groupedReactions[reaction.emoji]) {
-        groupedReactions[reaction.emoji] = [];
-      }
-      groupedReactions[reaction.emoji].push(reaction);
+    reactions.forEach((r: any) => {
+      if (!groupedReactions[r.emoji]) groupedReactions[r.emoji] = [];
+      groupedReactions[r.emoji].push({
+        ...r,
+        user: r.user_id
+          ? {
+              id: String(r.user_id._id),
+              username: r.user_id.username,
+              display_name: r.user_id.display_name,
+              profile_picture: r.user_id.profile_picture,
+            }
+          : null,
+      });
     });
 
     return NextResponse.json({
-      reactions: reactions || [],
+      reactions: reactions.map((r: any) => ({
+        ...r,
+        id: String(r._id),
+        user: r.user_id ? { id: String(r.user_id._id), ...r.user_id } : null,
+      })),
       grouped: groupedReactions,
     });
   } catch (error: any) {
@@ -166,6 +154,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-
-
-

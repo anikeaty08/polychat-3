@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { Call, User } from '@/lib/models';
 import { getCallsContract } from '@/lib/contracts';
 import { ethers } from 'ethers';
 
@@ -13,11 +14,7 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = verifyToken(token);
-    const { 
-      receiverWalletAddress, 
-      callType, 
-      transactionHash 
-    } = await req.json();
+    const { receiverWalletAddress, callType, transactionHash } = await req.json();
 
     if (!receiverWalletAddress || !callType || !transactionHash) {
       return NextResponse.json(
@@ -26,11 +23,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify transaction on-chain
     const provider = new ethers.JsonRpcProvider(
       process.env.NEXT_PUBLIC_POLYGON_AMOY_RPC
     );
-    
+
     try {
       const tx = await provider.getTransaction(transactionHash);
       if (!tx) {
@@ -48,39 +44,37 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Verify it's a call transaction
       const callsContract = getCallsContract(provider);
       const contractAddress = callsContract.target;
-      
       const receiptTo = receipt.to ? String(receipt.to) : '';
       const contractAddr = contractAddress ? String(contractAddress) : '';
-      if (receiptTo && contractAddr && receiptTo.toLowerCase() !== contractAddr.toLowerCase()) {
+      if (
+        receiptTo &&
+        contractAddr &&
+        receiptTo.toLowerCase() !== contractAddr.toLowerCase()
+      ) {
         return NextResponse.json(
           { error: 'Invalid contract address' },
           { status: 400 }
         );
       }
 
-      // Get user wallet address
-      const { data: user } = await supabaseAdmin
-        .from('users')
-        .select('wallet_address')
-        .eq('id', payload.userId)
-        .single();
+      await connectDB();
 
-      if (!user || user.wallet_address.toLowerCase() !== tx.from?.toLowerCase()) {
+      const user = await User.findById(payload.userId).select('wallet_address');
+      if (
+        !user ||
+        user.wallet_address.toLowerCase() !== tx.from?.toLowerCase()
+      ) {
         return NextResponse.json(
           { error: 'Wallet address mismatch' },
           { status: 403 }
         );
       }
 
-      // Get receiver user ID
-      const { data: receiver } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('wallet_address', receiverWalletAddress.toLowerCase())
-        .single();
+      const receiver = await User.findOne({
+        wallet_address: receiverWalletAddress.toLowerCase(),
+      }).select('_id');
 
       if (!receiver) {
         return NextResponse.json(
@@ -89,25 +83,17 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Create call record in database
-      const { data: call, error: callError } = await supabaseAdmin
-        .from('calls')
-        .insert({
-          caller_id: payload.userId,
-          receiver_id: receiver.id,
-          call_type: callType,
-          status: 'initiated',
-          transaction_hash: transactionHash,
-          on_chain: true,
-        })
-        .select()
-        .single();
+      const call = await Call.create({
+        caller_id: payload.userId,
+        receiver_id: receiver._id,
+        call_type: callType,
+        status: 'initiated',
+        transaction_hash: transactionHash,
+        on_chain: true,
+      });
 
-      if (callError) {
-        throw callError;
-      }
-
-      return NextResponse.json({ call });
+      const c = toApi(call)!;
+      return NextResponse.json({ call: c });
     } catch (error: any) {
       console.error('On-chain call error:', error);
       return NextResponse.json(
@@ -123,4 +109,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

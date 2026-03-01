@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { BlockedUser } from '@/lib/models';
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,23 +12,31 @@ export async function GET(req: NextRequest) {
     }
 
     const payload = verifyToken(token);
+    await connectDB();
 
-    const { data: blocked, error } = await supabaseAdmin
-      .from('blocked_users')
-      .select(
-        `
-        *,
-        user:users!blocked_users_blocked_id_fkey(id, username, display_name, profile_picture, wallet_address)
-      `
-      )
-      .eq('blocker_id', payload.userId)
-      .order('created_at', { ascending: false });
+    const blockedList = await BlockedUser.find({ blocker_id: payload.userId })
+      .populate('blocked_id', 'username display_name profile_picture wallet_address')
+      .sort({ createdAt: -1 })
+      .lean();
 
-    if (error) {
-      throw error;
-    }
+    const users = blockedList.map((b: any) => {
+      const blockedUser = b.blocked_id;
+      const u = toApi({ ...blockedUser, _id: blockedUser?._id });
+      return {
+        ...toApi(b)!,
+        user: blockedUser
+          ? {
+              id: String(blockedUser._id),
+              username: blockedUser.username,
+              display_name: blockedUser.display_name,
+              profile_picture: blockedUser.profile_picture,
+              wallet_address: blockedUser.wallet_address,
+            }
+          : null,
+      };
+    });
 
-    return NextResponse.json({ users: blocked || [] });
+    return NextResponse.json({ users });
   } catch (error: any) {
     console.error('Get blocked users error:', error);
     return NextResponse.json(
@@ -55,20 +64,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('blocked_users')
-      .insert({
-        blocker_id: payload.userId,
-        blocked_id: userId,
-      })
-      .select()
-      .single();
+    await connectDB();
 
-    if (error) {
-      throw error;
-    }
+    const blocked = await BlockedUser.create({
+      blocker_id: payload.userId,
+      blocked_id: userId,
+    });
 
-    return NextResponse.json({ success: true, blocked: data });
+    const b = toApi(blocked)!;
+    return NextResponse.json({ success: true, blocked: b });
   } catch (error: any) {
     console.error('Block user error:', error);
     return NextResponse.json(
@@ -77,6 +81,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-
-

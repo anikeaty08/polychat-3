@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import {
+  Conversation,
+  ConversationParticipant,
+  Message,
+  MessageReadReceipt,
+  PrivacySettings,
+} from '@/lib/models';
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,104 +18,87 @@ export async function GET(req: NextRequest) {
     }
 
     const payload = verifyToken(token);
+    await connectDB();
 
-    // Get all conversations for user
-    const { data: participants, error: participantsError } = await supabaseAdmin
-      .from('conversation_participants')
-      .select('conversation_id')
-      .eq('user_id', payload.userId);
+    const participants = await ConversationParticipant.find({
+      user_id: payload.userId,
+    }).distinct('conversation_id');
 
-    if (participantsError) {
-      throw participantsError;
-    }
-
-    const conversationIds = participants?.map((p) => p.conversation_id) || [];
-
-    if (conversationIds.length === 0) {
+    if (participants.length === 0) {
       return NextResponse.json({ conversations: [] });
     }
 
-    // Get conversations with last message
-    const { data: conversations, error: conversationsError } = await supabaseAdmin
-      .from('conversations')
-      .select(
-        `
-        *,
-        participants:conversation_participants(
-          user:users(id, username, display_name, profile_picture, wallet_address, is_online)
-        )
-      `
-      )
-      .in('id', conversationIds)
-      .order('updated_at', { ascending: false });
+    const conversations = await Conversation.find({ _id: { $in: participants } })
+      .sort({ updatedAt: -1 })
+      .lean();
 
-    if (conversationsError) {
-      throw conversationsError;
-    }
-
-    // Get last messages and unread counts
     const conversationsWithDetails = await Promise.all(
-      conversations.map(async (conv) => {
-        const { data: lastMessage } = await supabaseAdmin
-          .from('messages')
-          .select('*')
-          .eq('conversation_id', conv.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+      conversations.map(async (conv: any) => {
+        const lastMessage = await Message.findOne({
+          conversation_id: conv._id,
+        })
+          .sort({ createdAt: -1 })
+          .lean();
 
-        const { count: unreadCount } = await supabaseAdmin
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('conversation_id', conv.id)
-          .is('read_receipts', null);
+        const fromOthers = await Message.find({
+          conversation_id: conv._id,
+          sender_id: { $ne: payload.userId },
+        }).select('_id');
+        const readIds = await MessageReadReceipt.find({
+          user_id: payload.userId,
+          message_id: { $in: fromOthers.map((m: any) => m._id) },
+        }).distinct('message_id');
+        const unreadCount = fromOthers.length - readIds.length;
 
-        let participant = conv.participants?.find(
-          (p: any) => p.user?.id !== payload.userId
-        )?.user;
+        const participantRecords = await ConversationParticipant.find({
+          conversation_id: conv._id,
+        })
+          .populate('user_id', 'username display_name profile_picture wallet_address is_online')
+          .lean();
 
-        // Apply privacy settings for participant
+        let participant = participantRecords.find(
+          (p: any) => String(p.user_id?._id) !== payload.userId
+        )?.user_id as any;
+
         if (participant) {
-          const { data: privacySettings } = await supabaseAdmin
-            .from('privacy_settings')
-            .select('*')
-            .eq('user_id', participant.id)
-            .maybeSingle();
-
-          // Check if users are contacts (have a conversation together)
-          const isContact = true; // Since they have a conversation, they're effectively contacts
-
+          const privacySettings = await PrivacySettings.findOne({
+            user_id: participant._id,
+          });
+          const isContact = true;
           if (privacySettings) {
-            // Apply online status privacy
             if (privacySettings.online_status_visibility === 'nobody') {
               participant = { ...participant, is_online: null };
             } else if (privacySettings.online_status_visibility === 'contacts' && !isContact) {
               participant = { ...participant, is_online: null };
             }
-
-            // Apply last seen privacy
             if (privacySettings.last_seen_visibility === 'nobody') {
               participant = { ...participant, last_seen: null };
             } else if (privacySettings.last_seen_visibility === 'contacts' && !isContact) {
               participant = { ...participant, last_seen: null };
             }
-
-            // Apply profile photo privacy
-            // If photo_visibility is 'nobody', always hide
-            // If photo_visibility is 'contacts' and not a contact, hide
             if (privacySettings.photo_visibility === 'nobody') {
               participant = { ...participant, profile_picture: null };
             } else if (privacySettings.photo_visibility === 'contacts' && !isContact) {
               participant = { ...participant, profile_picture: null };
             }
-            // If 'everyone' or 'contacts' with isContact=true, show the photo
           }
+          participant = {
+            id: String(participant._id),
+            username: participant.username,
+            display_name: participant.display_name,
+            profile_picture: participant.profile_picture,
+            wallet_address: participant.wallet_address,
+            is_online: participant.is_online,
+          };
         }
 
         return {
           ...conv,
-          last_message: lastMessage,
-          unread_count: unreadCount || 0,
+          id: String(conv._id),
+          last_message: lastMessage
+            ? { ...lastMessage, id: String(lastMessage._id) }
+            : null,
+          unread_count: unreadCount,
           participant,
         };
       })
@@ -123,6 +113,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-
-
-

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { User } from '@/lib/models';
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,31 +12,29 @@ export async function GET(req: NextRequest) {
     }
 
     const payload = verifyToken(token);
+    await connectDB();
 
-    const { data: user, error } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('id', payload.userId)
-      .single();
+    const user = await User.findById(payload.userId);
 
-    if (error || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       );
     }
 
+    const u = toApi(user)!;
     return NextResponse.json({
       user: {
-        id: user.id,
-        wallet_address: user.wallet_address,
-        username: user.username,
-        display_name: user.display_name,
-        profile_picture: user.profile_picture,
-        status: user.status,
-        is_online: user.is_online,
-        last_seen: user.last_seen,
-        created_at: user.created_at,
+        id: u.id,
+        wallet_address: u.wallet_address,
+        username: u.username,
+        display_name: u.display_name,
+        profile_picture: u.profile_picture,
+        status: u.status,
+        is_online: u.is_online,
+        last_seen: u.last_seen,
+        created_at: u.createdAt,
       },
     });
   } catch (error: any) {
@@ -46,6 +45,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-
-
-

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB } from '@/lib/db';
+import { BlockedUser } from '@/lib/models';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const token = req.headers.get('authorization')?.replace('Bearer ', '');
@@ -14,15 +15,12 @@ export async function GET(
     }
 
     const payload = verifyToken(token);
-    const { id } = await params;
+    await connectDB();
 
-    // Check if current user has blocked the participant
-    const { data: blocked } = await supabaseAdmin
-      .from('blocked_users')
-      .select('id')
-      .eq('blocker_id', payload.userId)
-      .eq('blocked_id', id)
-      .maybeSingle();
+    const blocked = await BlockedUser.findOne({
+      blocker_id: payload.userId,
+      blocked_id: params.id,
+    });
 
     return NextResponse.json({ isBlocked: !!blocked });
   } catch (error: any) {
@@ -33,4 +31,3 @@ export async function GET(
     );
   }
 }
-

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { Conversation, Message, User } from '@/lib/models';
 import { sendMessageOnChain, createConversationOnChain } from '@/lib/server-wallet';
 import { getMessagingContract } from '@/lib/contracts';
 import { ethers } from 'ethers';
@@ -14,7 +15,13 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = verifyToken(token);
-    const { conversationId, receiverWalletAddress, content, messageType = 'text', ipfsHash = '' } = await req.json();
+    const {
+      conversationId,
+      receiverWalletAddress,
+      content,
+      messageType = 'text',
+      ipfsHash = '',
+    } = await req.json();
 
     if (!conversationId || !receiverWalletAddress || !content) {
       return NextResponse.json(
@@ -23,7 +30,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if SERVER_PRIVATE_KEY is configured
     if (!process.env.SERVER_PRIVATE_KEY) {
       return NextResponse.json(
         { error: 'Server wallet not configured' },
@@ -31,13 +37,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get user's wallet address
-    const { data: user } = await supabaseAdmin
-      .from('users')
-      .select('wallet_address')
-      .eq('id', payload.userId)
-      .single();
+    await connectDB();
 
+    const user = await User.findById(payload.userId).select('wallet_address');
     if (!user?.wallet_address) {
       return NextResponse.json(
         { error: 'User wallet address not found' },
@@ -47,7 +49,6 @@ export async function POST(req: NextRequest) {
 
     const senderWallet = user.wallet_address.toLowerCase();
 
-    // Get on-chain conversation ID
     const provider = new ethers.JsonRpcProvider(
       process.env.NEXT_PUBLIC_POLYGON_AMOY_RPC
     );
@@ -57,17 +58,17 @@ export async function POST(req: NextRequest) {
       receiverWalletAddress.toLowerCase()
     );
 
-    // Create conversation if needed
     try {
-      await createConversationOnChain(senderWallet, receiverWalletAddress.toLowerCase());
+      await createConversationOnChain(
+        senderWallet,
+        receiverWalletAddress.toLowerCase()
+      );
     } catch (error: any) {
-      // Conversation might already exist, continue
       if (!error.message?.includes('already exists')) {
         console.log('Conversation creation:', error);
       }
     }
 
-    // Send message on-chain using server wallet
     const { hash: transactionHash } = await sendMessageOnChain(
       onChainConversationId,
       receiverWalletAddress.toLowerCase(),
@@ -76,44 +77,30 @@ export async function POST(req: NextRequest) {
       ipfsHash
     );
 
-    // Record message in database
-    const { data: message, error: messageError } = await supabaseAdmin
-      .from('messages')
-      .insert({
-        conversation_id: conversationId,
-        sender_id: payload.userId,
-        content,
-        message_type: messageType,
-        ipfs_hash: ipfsHash || null,
-        transaction_hash: transactionHash,
-        on_chain: true,
-      })
-      .select()
-      .single();
+    const message = await Message.create({
+      conversation_id: conversationId,
+      sender_id: payload.userId,
+      content,
+      message_type: messageType,
+      ipfs_hash: ipfsHash || null,
+      transaction_hash: transactionHash,
+      on_chain: true,
+    });
 
-    if (messageError) {
-      throw messageError;
-    }
+    await Conversation.findByIdAndUpdate(conversationId, {
+      last_message_at: new Date(),
+    });
 
-    // Update conversation
-    await supabaseAdmin
-      .from('conversations')
-      .update({
-        updated_at: new Date().toISOString(),
-        last_message_at: new Date().toISOString(),
-      })
-      .eq('id', conversationId);
-
+    const m = toApi(message)!;
     return NextResponse.json({
       message: {
-        ...message,
+        ...m,
         is_read: false,
       },
     });
   } catch (error: any) {
     console.error('Server send message error:', error);
-    // Return user-friendly error message
-    const errorMessage = error.message?.includes('Failed to process') 
+    const errorMessage = error.message?.includes('Failed to process')
       ? 'Failed to send message. Please try again.'
       : error.message?.includes('not configured')
       ? 'Service temporarily unavailable'
@@ -124,4 +111,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

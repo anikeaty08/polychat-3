@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { Conversation, Message, MessageReadReceipt, User } from '@/lib/models';
 import { getMessagingContract } from '@/lib/contracts';
 import { ethers } from 'ethers';
 
@@ -13,13 +14,13 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = verifyToken(token);
-    const { 
-      conversationId, 
-      receiverWalletAddress, 
-      content, 
+    const {
+      conversationId,
+      receiverWalletAddress,
+      content,
       messageType = 'text',
       ipfsHash = '',
-      transactionHash 
+      transactionHash,
     } = await req.json();
 
     if (!conversationId || !receiverWalletAddress || !content || !transactionHash) {
@@ -29,11 +30,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify transaction on-chain
     const provider = new ethers.JsonRpcProvider(
       process.env.NEXT_PUBLIC_POLYGON_AMOY_RPC
     );
-    
+
     try {
       const tx = await provider.getTransaction(transactionHash);
       if (!tx) {
@@ -51,26 +51,28 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Verify it's a message transaction
       const messagingContract = getMessagingContract(provider);
       const contractAddress = String(messagingContract.target);
       const receiptTo = receipt.to ? String(receipt.to) : '';
-      
-      if (receiptTo && contractAddress && receiptTo.toLowerCase() !== contractAddress.toLowerCase()) {
+
+      if (
+        receiptTo &&
+        contractAddress &&
+        receiptTo.toLowerCase() !== contractAddress.toLowerCase()
+      ) {
         return NextResponse.json(
           { error: 'Invalid contract address' },
           { status: 400 }
         );
       }
 
-      // Get user wallet address
-      const { data: user } = await supabaseAdmin
-        .from('users')
-        .select('wallet_address')
-        .eq('id', payload.userId)
-        .single();
+      await connectDB();
 
-      if (!user || user.wallet_address.toLowerCase() !== tx.from?.toLowerCase()) {
+      const user = await User.findById(payload.userId).select('wallet_address');
+      if (
+        !user ||
+        user.wallet_address.toLowerCase() !== tx.from?.toLowerCase()
+      ) {
         return NextResponse.json(
           { error: 'Wallet address mismatch' },
           { status: 403 }
@@ -84,46 +86,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create message in database
-    const { data: message, error: messageError } = await supabaseAdmin
-      .from('messages')
-      .insert({
-        conversation_id: conversationId,
-        sender_id: payload.userId,
-        content,
-        message_type: messageType,
-        ipfs_hash: ipfsHash,
-        transaction_hash: transactionHash,
-        on_chain: true,
-      })
-      .select()
-      .single();
+    const message = await Message.create({
+      conversation_id: conversationId,
+      sender_id: payload.userId,
+      content,
+      message_type: messageType,
+      ipfs_hash: ipfsHash,
+      transaction_hash: transactionHash,
+      on_chain: true,
+    });
 
-    if (messageError) {
-      throw messageError;
-    }
-
-    // Mark as read by sender
-    await supabaseAdmin.from('message_read_receipts').insert({
-      message_id: message.id,
+    await MessageReadReceipt.create({
+      message_id: message._id,
       user_id: payload.userId,
     });
 
-    // Update conversation
-    await supabaseAdmin
-      .from('conversations')
-      .update({
-        updated_at: new Date().toISOString(),
-        last_message_at: new Date().toISOString(),
-      })
-      .eq('id', conversationId);
+    await Conversation.findByIdAndUpdate(conversationId, {
+      last_message_at: new Date(),
+    });
 
-    return NextResponse.json({ 
+    const m = toApi(message)!;
+    return NextResponse.json({
       message: {
-        ...message,
+        ...m,
         is_read: false,
         read_at: null,
-      }
+      },
     });
   } catch (error: any) {
     console.error('On-chain message error:', error);
@@ -133,4 +121,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

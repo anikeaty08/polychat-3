@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { Conversation, ConversationParticipant, PrivacySettings } from '@/lib/models';
 
 export async function GET(
   req: NextRequest,
@@ -14,32 +15,24 @@ export async function GET(
     }
 
     const payload = verifyToken(token);
+    await connectDB();
 
-    const { data: conversation, error } = await supabaseAdmin
-      .from('conversations')
-      .select(
-        `
-        *,
-        participants:conversation_participants(
-          user_id,
-          role,
-          user:users(*)
-        )
-      `
-      )
-      .eq('id', params.id)
-      .single();
-
-    if (error || !conversation) {
+    const conversation = await Conversation.findById(params.id);
+    if (!conversation) {
       return NextResponse.json(
         { error: 'Conversation not found' },
         { status: 404 }
       );
     }
 
-    // Check if user is participant
-    const isParticipant = conversation.participants?.some(
-      (p: any) => p.user_id === payload.userId
+    const participants = await ConversationParticipant.find({
+      conversation_id: params.id,
+    })
+      .populate('user_id')
+      .lean();
+
+    const isParticipant = participants.some(
+      (p: any) => String(p.user_id?._id) === payload.userId
     );
 
     if (!isParticipant) {
@@ -49,60 +42,50 @@ export async function GET(
       );
     }
 
-    // Apply privacy settings for participants
     const participantsWithPrivacy = await Promise.all(
-      (conversation.participants || []).map(async (p: any) => {
-        if (!p.user || p.user.id === payload.userId) {
-          return p; // Don't apply privacy to self
+      participants.map(async (p: any) => {
+        if (!p.user_id || String(p.user_id._id) === payload.userId) {
+          return { ...p, user: p.user_id };
         }
 
-        const { data: privacySettings } = await supabaseAdmin
-          .from('privacy_settings')
-          .select('*')
-          .eq('user_id', p.user.id)
-          .maybeSingle();
+        const privacySettings = await PrivacySettings.findOne({
+          user_id: p.user_id._id,
+        });
+        const isContact = true; // have conversation
 
-        // Check if users are contacts (have a conversation together)
-        const isContact = true; // Since they have a conversation, they're effectively contacts
-
-        let user = { ...p.user };
+        let user: any = p.user_id && typeof p.user_id === 'object'
+          ? (p.user_id as any).toObject?.() || { ...p.user_id }
+          : p.user_id;
 
         if (privacySettings) {
-          // Apply online status privacy
           if (privacySettings.online_status_visibility === 'contacts' && !isContact) {
             user.is_online = null;
           } else if (privacySettings.online_status_visibility === 'nobody') {
             user.is_online = null;
           }
-
-          // Apply last seen privacy
           if (privacySettings.last_seen_visibility === 'contacts' && !isContact) {
             user.last_seen = null;
           } else if (privacySettings.last_seen_visibility === 'nobody') {
             user.last_seen = null;
           }
-
-          // Apply profile photo privacy
-          // If photo_visibility is 'contacts', show only if they have a conversation (are contacts)
-          // If photo_visibility is 'nobody', always hide
           if (privacySettings.photo_visibility === 'nobody') {
             user.profile_picture = null;
           } else if (privacySettings.photo_visibility === 'contacts' && !isContact) {
             user.profile_picture = null;
           }
-          // If 'everyone' or 'contacts' with isContact=true, show the photo
         }
 
         return {
           ...p,
-          user,
+          user: { ...user, id: String(user._id) },
         };
       })
     );
 
+    const c = toApi(conversation)!;
     return NextResponse.json({
       conversation: {
-        ...conversation,
+        ...c,
         participants: participantsWithPrivacy,
       },
     });
@@ -114,6 +97,3 @@ export async function GET(
     );
   }
 }
-
-
-

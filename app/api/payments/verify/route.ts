@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
+import { connectDB, toApi } from '@/lib/db';
+import { Payment } from '@/lib/models';
 import { verifyTransaction } from '@/lib/polygon';
 import { getPayment } from '@/lib/contracts';
-import { supabaseAdmin } from '@/lib/supabase';
 import { ethers } from 'ethers';
 
 export async function POST(req: NextRequest) {
@@ -16,38 +17,37 @@ export async function POST(req: NextRequest) {
     const payload = verifyToken(token);
     const { txHash, amount, to, paymentId } = await req.json();
 
-    // If paymentId is provided, verify through smart contract
     if (paymentId) {
       try {
         const provider = new ethers.JsonRpcProvider(
           process.env.NEXT_PUBLIC_POLYGON_AMOY_RPC
         );
         const payment = await getPayment(provider, paymentId);
-        
-        if (payment.payer.toLowerCase() !== payload.walletAddress.toLowerCase()) {
+
+        if (
+          payment.payer.toLowerCase() !== payload.walletAddress?.toLowerCase()
+        ) {
           return NextResponse.json(
             { error: 'Payment does not belong to user' },
             { status: 403 }
           );
         }
 
-        // Record payment from contract
-        const { data: paymentRecord, error: paymentError } = await supabaseAdmin
-          .from('payments')
-          .insert({
-            user_id: payload.userId,
-            transaction_hash: paymentId,
-            amount: payment.amount.toString(),
-            status: payment.verified ? 'confirmed' : 'pending',
-            verified_at: payment.verified ? new Date().toISOString() : null,
-          })
-          .select()
-          .single();
+        await connectDB();
 
+        const paymentRecord = await Payment.create({
+          user_id: payload.userId,
+          transaction_hash: paymentId,
+          amount: payment.amount.toString(),
+          status: payment.verified ? 'confirmed' : 'pending',
+          verified_at: payment.verified ? new Date() : null,
+        });
+
+        const p = toApi(paymentRecord)!;
         return NextResponse.json({
           success: true,
           payment: {
-            id: paymentRecord?.id,
+            id: p.id,
             transaction_hash: paymentId,
             amount: payment.amount.toString(),
             verified: payment.verified,
@@ -62,7 +62,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Fallback to transaction hash verification
     if (!txHash) {
       return NextResponse.json(
         { error: 'Transaction hash or payment ID is required' },
@@ -70,7 +69,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify transaction on blockchain
     const isValid = await verifyTransaction(
       txHash,
       payload.walletAddress,
@@ -85,27 +83,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Record payment
-    const { data: payment, error: paymentError } = await supabaseAdmin
-      .from('payments')
-      .insert({
-        user_id: payload.userId,
-        transaction_hash: txHash,
-        amount: amount?.toString() || '0',
-        status: 'confirmed',
-        verified_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    await connectDB();
 
-    if (paymentError) {
-      // Payment might already exist
-      console.error('Payment record error:', paymentError);
-    }
+    const payment = await Payment.create({
+      user_id: payload.userId,
+      transaction_hash: txHash,
+      amount: amount?.toString() || '0',
+      status: 'confirmed',
+      verified_at: new Date(),
+    });
 
+    const p = toApi(payment)!;
     return NextResponse.json({
       success: true,
-      payment: payment || { transaction_hash: txHash },
+      payment: p || { transaction_hash: txHash },
     });
   } catch (error: any) {
     console.error('Payment verification error:', error);
@@ -115,4 +106,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

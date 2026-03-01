@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { Payment } from '@/lib/models';
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,37 +12,39 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = verifyToken(token);
-    const { transactionHash, amount, recipientAddress, paymentPlatform } = await req.json();
+    const {
+      transactionHash,
+      amount,
+      recipientAddress,
+      paymentPlatform,
+    } = await req.json();
 
     if (!transactionHash || !amount || !recipientAddress) {
       return NextResponse.json(
-        { error: 'Transaction hash, amount, and recipient address are required' },
+        {
+          error:
+            'Transaction hash, amount, and recipient address are required',
+        },
         { status: 400 }
       );
     }
 
-    // Record payment in database
-    const { data: payment, error: paymentError } = await supabaseAdmin
-      .from('payments')
-      .insert({
-        user_id: payload.userId,
-        transaction_hash: transactionHash,
-        amount: amount.toString(),
-        status: 'confirmed',
-        recipient_address: recipientAddress,
-        payment_platform: paymentPlatform || 'metamask',
-      })
-      .select()
-      .single();
+    await connectDB();
 
-    if (paymentError) {
-      throw paymentError;
-    }
+    const payment = await Payment.create({
+      user_id: payload.userId,
+      transaction_hash: transactionHash,
+      amount: amount.toString(),
+      status: 'confirmed',
+      recipient_address: recipientAddress,
+      payment_platform: paymentPlatform || 'metamask',
+    });
 
+    const p = toApi(payment)!;
     return NextResponse.json({
       success: true,
       payment: {
-        id: payment.id,
+        id: p.id,
         transactionHash,
         amount: amount.toString(),
         status: 'confirmed',
@@ -55,6 +58,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-
-

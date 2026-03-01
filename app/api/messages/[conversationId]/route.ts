@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import {
+  ConversationParticipant,
+  Message,
+  MessageReadReceipt,
+  MessageReaction,
+} from '@/lib/models';
 
 export async function GET(
   req: NextRequest,
@@ -17,13 +23,12 @@ export async function GET(
     const limit = parseInt(req.nextUrl.searchParams.get('limit') || '50');
     const offset = parseInt(req.nextUrl.searchParams.get('offset') || '0');
 
-    // Verify user is participant
-    const { data: participant } = await supabaseAdmin
-      .from('conversation_participants')
-      .select('conversation_id')
-      .eq('conversation_id', params.conversationId)
-      .eq('user_id', payload.userId)
-      .single();
+    await connectDB();
+
+    const participant = await ConversationParticipant.findOne({
+      conversation_id: params.conversationId,
+      user_id: payload.userId,
+    });
 
     if (!participant) {
       return NextResponse.json(
@@ -32,81 +37,81 @@ export async function GET(
       );
     }
 
-    // Get messages
-    const { data: messages, error } = await supabaseAdmin
-      .from('messages')
-      .select('*')
-      .eq('conversation_id', params.conversationId)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    const messages = await Message.find({
+      conversation_id: params.conversationId,
+    })
+      .sort({ createdAt: -1 })
+      .skip(offset)
+      .limit(limit)
+      .lean();
 
-    if (error) {
-      throw error;
-    }
+    const otherParticipant = await ConversationParticipant.findOne({
+      conversation_id: params.conversationId,
+      user_id: { $ne: payload.userId },
+    }).lean();
 
-    // Get other participant ID
-    const { data: otherParticipant } = await supabaseAdmin
-      .from('conversation_participants')
-      .select('user_id')
-      .eq('conversation_id', params.conversationId)
-      .neq('user_id', payload.userId)
-      .single();
+    const messageIds = messages.map((m: any) => m._id);
+    const readReceipts = await MessageReadReceipt.find({
+      message_id: { $in: messageIds },
+    }).lean();
 
-    // Get all read receipts for these messages
-    const messageIds = messages?.map((m) => m.id) || [];
-    const { data: readReceipts } = await supabaseAdmin
-      .from('message_read_receipts')
-      .select('message_id, user_id, read_at')
-      .in('message_id', messageIds);
-
-    // Mark messages as read by current user
-    if (messages && messages.length > 0) {
-      await supabaseAdmin.from('message_read_receipts').upsert(
-        messageIds.map((id) => ({
-          message_id: id,
-          user_id: payload.userId,
-        })),
-        { onConflict: 'message_id,user_id' }
+    // Mark messages as read by current user (upsert)
+    for (const msg of messages) {
+      await MessageReadReceipt.findOneAndUpdate(
+        { message_id: msg._id, user_id: payload.userId },
+        { read_at: new Date() },
+        { upsert: true }
       );
     }
 
-    // Get all reactions for these messages
-    const { data: messageReactions } = messageIds.length > 0
-      ? await supabaseAdmin
-          .from('message_reactions')
-          .select(`
-            *,
-            user:users(id, username, display_name, profile_picture)
-          `)
-          .in('message_id', messageIds)
-      : { data: null };
+    const messageReactions =
+      messageIds.length > 0
+        ? await MessageReaction.find({ message_id: { $in: messageIds } })
+          .populate('user_id', 'username display_name profile_picture')
+          .lean()
+        : [];
 
-    // Group reactions by message ID
     const reactionsByMessage: Record<string, any[]> = {};
-    messageReactions?.forEach((reaction: any) => {
-      if (!reactionsByMessage[reaction.message_id]) {
-        reactionsByMessage[reaction.message_id] = [];
-      }
-      reactionsByMessage[reaction.message_id].push(reaction);
+    messageReactions.forEach((r: any) => {
+      const mid = String(r.message_id);
+      if (!reactionsByMessage[mid]) reactionsByMessage[mid] = [];
+      reactionsByMessage[mid].push({
+        ...r,
+        user: r.user_id
+          ? {
+              id: String(r.user_id._id),
+              username: r.user_id.username,
+              display_name: r.user_id.display_name,
+              profile_picture: r.user_id.profile_picture,
+            }
+          : null,
+      });
     });
 
-    // Add read receipt status and reactions to messages
-    const messagesWithStatus = messages?.map((msg) => {
-      const receipts = readReceipts?.filter((rr) => rr.message_id === msg.id) || [];
+    const messagesWithStatus = messages.map((msg: any) => {
+      const receipts = readReceipts.filter(
+        (rr: any) => String(rr.message_id) === String(msg._id)
+      );
       const isRead = otherParticipant
-        ? receipts.some((rr) => rr.user_id === otherParticipant.user_id)
+        ? receipts.some(
+            (rr: any) => String(rr.user_id) === String(otherParticipant.user_id)
+          )
         : false;
+      const otherReceipt = receipts.find(
+        (rr: any) => String(rr.user_id) === String(otherParticipant?.user_id)
+      );
       return {
         ...msg,
+        id: String(msg._id),
         is_read: isRead,
-        read_at: receipts.find((rr) => rr.user_id === otherParticipant?.user_id)?.read_at || null,
-        reactions: reactionsByMessage[msg.id] || [],
+        read_at: otherReceipt?.read_at || null,
+        reactions: reactionsByMessage[String(msg._id)] || [],
       };
     });
 
     return NextResponse.json({
-      messages: messagesWithStatus?.reverse() || [],
-      hasMore: (messages?.length || 0) === limit,
+      messages: messagesWithStatus.reverse(),
+      hasMore: messages.length === limit,
     });
   } catch (error: any) {
     console.error('Get messages error:', error);
@@ -116,4 +121,3 @@ export async function GET(
     );
   }
 }
-

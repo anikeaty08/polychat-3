@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB, toApi } from '@/lib/db';
+import { User, PrivacySettings, BlockedUser, Contact } from '@/lib/models';
 
 export async function GET(
   req: NextRequest,
@@ -14,34 +15,22 @@ export async function GET(
     }
 
     const payload = verifyToken(token);
+    await connectDB();
 
-    const { data: user, error } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('id', params.id)
-      .single();
-
-    if (error || !user) {
+    const user = await User.findById(params.id);
+    if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       );
     }
 
-    // Check privacy settings
-    const { data: privacySettings } = await supabaseAdmin
-      .from('privacy_settings')
-      .select('*')
-      .eq('user_id', params.id)
-      .maybeSingle();
+    const privacySettings = await PrivacySettings.findOne({ user_id: params.id });
 
-    // Check if blocked
-    const { data: blocked } = await supabaseAdmin
-      .from('blocked_users')
-      .select('id')
-      .eq('blocker_id', params.id)
-      .eq('blocked_id', payload.userId)
-      .maybeSingle();
+    const blocked = await BlockedUser.findOne({
+      blocker_id: params.id,
+      blocked_id: payload.userId,
+    });
 
     if (blocked) {
       return NextResponse.json(
@@ -50,27 +39,20 @@ export async function GET(
       );
     }
 
-    // Check if viewing own profile
     const isOwnProfile = params.id === payload.userId;
 
-    // Apply privacy settings
     let showOnlineStatus = true;
     let showLastSeen = true;
     let showProfilePicture = true;
     let showStatus = true;
 
     if (!isOwnProfile && privacySettings) {
-      // Check if users are contacts
-      const { data: isContact } = await supabaseAdmin
-        .from('contacts')
-        .select('id')
-        .eq('user_id', params.id)
-        .eq('contact_id', payload.userId)
-        .maybeSingle();
-
+      const isContact = await Contact.findOne({
+        user_id: params.id,
+        contact_id: payload.userId,
+      });
       const isContactUser = !!isContact;
 
-      // Apply privacy rules
       if (privacySettings.online_status_visibility === 'contacts' && !isContactUser) {
         showOnlineStatus = false;
       } else if (privacySettings.online_status_visibility === 'nobody') {
@@ -96,17 +78,18 @@ export async function GET(
       }
     }
 
+    const u = toApi(user)!;
     return NextResponse.json({
       user: {
-        id: user.id,
-        wallet_address: user.wallet_address,
-        username: user.username,
-        display_name: user.display_name,
-        profile_picture: showProfilePicture ? user.profile_picture : null,
-        status: showStatus ? user.status : null,
-        is_online: showOnlineStatus ? user.is_online : null,
-        last_seen: showLastSeen ? user.last_seen : null,
-        created_at: user.created_at,
+        id: u.id,
+        wallet_address: u.wallet_address,
+        username: u.username,
+        display_name: u.display_name,
+        profile_picture: showProfilePicture ? u.profile_picture : null,
+        status: showStatus ? u.status : null,
+        is_online: showOnlineStatus ? u.is_online : null,
+        last_seen: showLastSeen ? u.last_seen : null,
+        created_at: u.createdAt,
       },
     });
   } catch (error: any) {
@@ -117,4 +100,3 @@ export async function GET(
     );
   }
 }
-

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB } from '@/lib/db';
+import { Status } from '@/lib/models';
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,21 +15,19 @@ export async function POST(req: NextRequest) {
     const { storyId } = await req.json();
 
     if (!storyId) {
-      return NextResponse.json({ error: 'Story ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Story ID is required' },
+        { status: 400 }
+      );
     }
 
-    // Update views count
-    const { data: status } = await supabaseAdmin
-      .from('statuses')
-      .select('views_count')
-      .eq('id', storyId)
-      .single();
+    await connectDB();
 
+    const status = await Status.findById(storyId);
     if (status) {
-      await supabaseAdmin
-        .from('statuses')
-        .update({ views_count: (status.views_count || 0) + 1 })
-        .eq('id', storyId);
+      await Status.findByIdAndUpdate(storyId, {
+        views_count: (status.views_count || 0) + 1,
+      });
     }
 
     return NextResponse.json({ success: true });
@@ -40,4 +39,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

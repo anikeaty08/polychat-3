@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB } from '@/lib/db';
+import { User } from '@/lib/models';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,18 +14,12 @@ export async function POST(req: NextRequest) {
     const payload = verifyToken(token);
     const { isOnline } = await req.json();
 
-    // Update user's online status and last_seen
-    const { error } = await supabaseAdmin
-      .from('users')
-      .update({
-        is_online: isOnline !== false,
-        last_seen: new Date().toISOString(),
-      })
-      .eq('id', payload.userId);
+    await connectDB();
 
-    if (error) {
-      throw error;
-    }
+    await User.findByIdAndUpdate(payload.userId, {
+      is_online: isOnline !== false,
+      last_seen: new Date(),
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -35,6 +30,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-
-

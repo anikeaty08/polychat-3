@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB } from '@/lib/db';
+import { BlockedUser } from '@/lib/models';
 
 export async function DELETE(
   req: NextRequest,
@@ -14,16 +15,12 @@ export async function DELETE(
     }
 
     const payload = verifyToken(token);
+    await connectDB();
 
-    const { error } = await supabaseAdmin
-      .from('blocked_users')
-      .delete()
-      .eq('blocker_id', payload.userId)
-      .eq('blocked_id', params.id);
-
-    if (error) {
-      throw error;
-    }
+    await BlockedUser.deleteOne({
+      blocker_id: payload.userId,
+      blocked_id: params.id,
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -34,6 +31,3 @@ export async function DELETE(
     );
   }
 }
-
-
-

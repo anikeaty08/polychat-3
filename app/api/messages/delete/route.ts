@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB } from '@/lib/db';
+import { Message } from '@/lib/models';
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,29 +21,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify user owns all messages
-    const { data: messages } = await supabaseAdmin
-      .from('messages')
-      .select('id, sender_id')
-      .in('id', messageIds);
+    await connectDB();
 
-    const unauthorizedMessages = messages?.filter((msg) => msg.sender_id !== payload.userId);
-    if (unauthorizedMessages && unauthorizedMessages.length > 0) {
+    const messages = await Message.find({ _id: { $in: messageIds } }).select(
+      'sender_id'
+    );
+
+    const unauthorized = messages.filter(
+      (m) => String(m.sender_id) !== payload.userId
+    );
+    if (unauthorized.length > 0) {
       return NextResponse.json(
         { error: 'You can only delete your own messages' },
         { status: 403 }
       );
     }
 
-    // Delete messages
-    const { error: deleteError } = await supabaseAdmin
-      .from('messages')
-      .delete()
-      .in('id', messageIds);
-
-    if (deleteError) {
-      throw deleteError;
-    }
+    await Message.deleteMany({ _id: { $in: messageIds } });
 
     return NextResponse.json({ success: true, deletedCount: messageIds.length });
   } catch (error: any) {
@@ -53,6 +48,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-
-

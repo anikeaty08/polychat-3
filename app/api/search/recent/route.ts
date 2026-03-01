@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
+import { connectDB } from '@/lib/db';
+import { SearchHistory } from '@/lib/models';
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,20 +12,16 @@ export async function GET(req: NextRequest) {
     }
 
     const payload = verifyToken(token);
+    await connectDB();
 
-    const { data: searches, error } = await supabaseAdmin
-      .from('search_history')
+    const searches = await SearchHistory.find({ user_id: payload.userId })
+      .sort({ createdAt: -1 })
+      .limit(10)
       .select('search_term')
-      .eq('user_id', payload.userId)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (error) {
-      throw error;
-    }
+      .lean();
 
     const uniqueSearches = Array.from(
-      new Set(searches?.map((s) => s.search_term) || [])
+      new Set(searches.map((s: any) => s.search_term))
     );
 
     return NextResponse.json({ searches: uniqueSearches });
@@ -36,6 +33,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-
-
-
