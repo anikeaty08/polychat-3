@@ -141,6 +141,30 @@ npm run dev
 2. **Pinata** - Get API keys at [pinata.cloud](https://pinata.cloud)
 3. **Configure `.env`** with your credentials
 
+### Environment Variables (Important)
+
+**Public smart contract addresses (required, but safe to expose):**
+
+- `NEXT_PUBLIC_PAYMENT_ESCROW_ADDRESS`  
+  `0xDb64B3871a6716590282b35Febf4b8317fAA5bC5`
+- `NEXT_PUBLIC_USER_REGISTRY_ADDRESS`  
+  `0xBB5d29FFF3992c415BD32508af346539c6Dc1b64`
+- `NEXT_PUBLIC_MESSAGING_CONTRACT_ADDRESS`  
+  `0x557c86a36ae3E2DBf233198E63608ec7463933E4`
+- `NEXT_PUBLIC_CALLS_CONTRACT_ADDRESS`  
+  `0xD689b6fEdC33f45B29F2d00E56C0E174655F1E30`
+- `NEXT_PUBLIC_STATUS_CONTRACT_ADDRESS`  
+  `0xB6C5AA9Dec08844B92c9Ab492d03c4A29a0b4368`
+
+**Server wallet (address is public, key is PRIVATE):**
+
+- `SERVER_WALLET_ADDRESS`  
+  e.g. `0xe0D4c260C2C5e087865B0b0e01eB2Bd41B64eb73`
+- `SERVER_PRIVATE_KEY` **(DO NOT COMMIT, KEEP SECRET)**  
+  Store only in `.env` / deployment secrets, never in git or client code.
+
+Make sure these values are set correctly in `.env` before running the app in production.
+
 ---
 
 ## 📱 Pages
