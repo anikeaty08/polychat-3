@@ -7,6 +7,7 @@ import { ArrowLeft, MessageCircle, UserPlus, Shield, AlertTriangle, Copy, QrCode
 import { formatAddress, formatTime, formatLastSeen } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import Image from 'next/image';
+import OnChainCoreStatus from '@/components/OnChainCoreStatus';
 
 interface UserProfileProps {
   userId?: string;
@@ -279,14 +280,15 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
           </div>
         )}
 
-        {/* Encryption Badge */}
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+        {/* Encryption & On-chain Badges */}
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4 space-y-2">
           <div className="flex items-center space-x-2">
             <Shield className="w-5 h-5 text-green-600 dark:text-green-400" />
             <p className="text-sm text-green-900 dark:text-green-100">
               🔐 E2E Encrypted Connection
             </p>
           </div>
+          <OnChainCoreStatus compact />
         </div>
 
         {/* Action Buttons */}

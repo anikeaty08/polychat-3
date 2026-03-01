@@ -8,6 +8,7 @@ import { formatTime } from '@/lib/utils';
 import Image from 'next/image';
 import StatusTab from './StatusTab';
 import { io, Socket } from 'socket.io-client';
+import OnChainCoreStatus from '@/components/OnChainCoreStatus';
 
 export default function ChatList() {
   const router = useRouter();
@@ -236,7 +237,7 @@ export default function ChatList() {
         </div>
 
         {/* Search Bar */}
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-2">
           <div className="relative group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
             <input
@@ -267,12 +268,13 @@ export default function ChatList() {
           </div>
         </div>
 
-        {/* Encryption Badge */}
-        <div className="flex justify-center pb-3">
+        {/* Security Badges */}
+        <div className="flex flex-col items-center gap-2 pb-3">
           <div className="encrypted-badge">
             <Lock className="w-3 h-3" />
             <span>End-to-end encrypted</span>
           </div>
+          <OnChainCoreStatus compact />
         </div>
 
         {/* Tabs */}
