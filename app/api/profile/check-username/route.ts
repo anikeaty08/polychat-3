@@ -8,17 +8,17 @@ export async function GET(req: NextRequest) {
     const username = req.nextUrl.searchParams.get('username');
 
     if (!username) {
-      return NextResponse.json({ available: false }, { status: 400 });
+      return NextResponse.json({ available: false, reason: 'Username is required' }, { status: 400 });
     }
 
     const validation = usernameSchema.safeParse(username);
     if (!validation.success) {
-      return NextResponse.json({ available: false });
+      return NextResponse.json({ available: false, reason: validation.error.issues?.[0]?.message || 'Invalid username' });
     }
 
     await connectDB();
 
-    const existing = await User.findOne({ username: username.toLowerCase() });
+    const existing = await User.findOne({ username: validation.data.toLowerCase() });
 
     return NextResponse.json({ available: !existing });
   } catch (error) {

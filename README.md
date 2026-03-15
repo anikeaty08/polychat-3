@@ -135,6 +135,8 @@ cp env.txt .env
 npm run dev
 ```
 
+`npm run dev` starts both the Next.js app (default `http://localhost:3000`) and the Socket.io server (default `http://localhost:3001`).
+
 ### Environment Setup
 
 1. **MongoDB** - Use [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) or local MongoDB
@@ -155,6 +157,13 @@ npm run dev
   `0xD689b6fEdC33f45B29F2d00E56C0E174655F1E30`
 - `NEXT_PUBLIC_STATUS_CONTRACT_ADDRESS`  
   `0xB6C5AA9Dec08844B92c9Ab492d03c4A29a0b4368`
+
+**Optional ERC-20 token addresses (for direct token payments):**
+
+- `NEXT_PUBLIC_NATIVE_SYMBOL` (default `MATIC`)
+- `NEXT_PUBLIC_TOKEN_USDC_ADDRESS`
+- `NEXT_PUBLIC_TOKEN_USDT_ADDRESS`
+- `NEXT_PUBLIC_TOKEN_DAI_ADDRESS`
 
 **Server wallet (address is public, key is PRIVATE):**
 

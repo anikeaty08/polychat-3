@@ -27,14 +27,16 @@ export async function POST(req: NextRequest) {
     const validation = createProfileSchema.safeParse({ username, displayName, status });
     if (!validation.success) {
       return NextResponse.json(
-        { error: 'Invalid input data' },
+        { error: validation.error.issues?.[0]?.message || 'Invalid input data' },
         { status: 400 }
       );
     }
 
     await connectDB();
 
-    const existingUser = await User.findOne({ username: username.toLowerCase() });
+    const normalizedUsername = validation.data.username.toLowerCase();
+
+    const existingUser = await User.findOne({ username: normalizedUsername });
     if (existingUser) {
       return NextResponse.json(
         { error: 'Username already taken' },
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest) {
     const user = await User.findByIdAndUpdate(
       payload.userId,
       {
-        username: username.toLowerCase(),
+        username: normalizedUsername,
         display_name: displayName || null,
         status: status || null,
         profile_picture: profilePictureUrl,

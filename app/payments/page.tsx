@@ -1,20 +1,48 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store';
-import { Wallet, ArrowLeft } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { getPaymentTokens, type PaymentToken } from '@/lib/tokens';
 import { ethers } from 'ethers';
+import toast from 'react-hot-toast';
+import { ArrowLeft, Coins, Copy, ExternalLink, ShieldCheck, Wallet } from 'lucide-react';
 
-export default function PaymentsPage() {
+const ERC20_ABI = [
+  'function decimals() view returns (uint8)',
+  'function symbol() view returns (string)',
+  'function balanceOf(address) view returns (uint256)',
+  'function transfer(address to, uint256 amount) returns (bool)',
+];
+
+function formatAmount(value: bigint, decimals: number, maxFraction = 6) {
+  const s = ethers.formatUnits(value, decimals);
+  const [i, f = ''] = s.split('.');
+  if (!f) return i;
+  return `${i}.${f.slice(0, maxFraction)}`.replace(/\.$/, '');
+}
+
+function PaymentsInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, token } = useAuthStore();
+
+  const tokens = useMemo(() => getPaymentTokens(), []);
+  const [selectedTokenKey, setSelectedTokenKey] = useState<string>(tokens[0]?.symbol || 'MATIC');
+
   const [payments, setPayments] = useState<any[]>([]);
-  const [amount, setAmount] = useState('0.01');
   const [recipientAddress, setRecipientAddress] = useState('');
-  const [paymentPlatform, setPaymentPlatform] = useState<'metamask' | 'walletconnect' | 'privy' | 'magic'>('metamask');
+  const [amount, setAmount] = useState('0.01');
   const [loading, setLoading] = useState(false);
+  const [senderAddress, setSenderAddress] = useState<string>('');
+  const [nativeBalance, setNativeBalance] = useState<bigint>(0n);
+  const [tokenBalance, setTokenBalance] = useState<bigint>(0n);
+  const [chainId, setChainId] = useState<number | null>(null);
+
+  const selectedToken: PaymentToken | undefined = useMemo(
+    () => tokens.find((t) => t.symbol === selectedTokenKey) || tokens[0],
+    [tokens, selectedTokenKey]
+  );
 
   useEffect(() => {
     if (!user || !token) {
@@ -22,32 +50,57 @@ export default function PaymentsPage() {
       return;
     }
 
-    // Check wallet connection
-    if (typeof window !== 'undefined' && window.ethereum) {
-      window.ethereum.request({ method: 'eth_accounts' })
-        .then((accounts: string[]) => {
-          if (accounts.length === 0) {
-            router.push('/auth/wallet');
-            return;
-          }
-          loadPayments();
-        })
-        .catch(() => {
-          router.push('/auth/wallet');
-        });
-    } else {
-      router.push('/auth/wallet');
-    }
+    const to = searchParams.get('to');
+    if (to && ethers.isAddress(to)) setRecipientAddress(to);
+    const a = searchParams.get('amount');
+    if (a && !Number.isNaN(Number(a))) setAmount(a);
+    const sym = searchParams.get('token');
+    if (sym && tokens.some((t) => t.symbol === sym)) setSelectedTokenKey(sym);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, token]);
+
+  const getProvider = () => {
+    const eth = (window as any).ethereum;
+    if (!eth) return null;
+    return new ethers.BrowserProvider(eth);
+  };
+
+  const refreshWalletState = async () => {
+    const provider = getProvider();
+    if (!provider) return;
+
+    try {
+      const accounts: string[] = await provider.send('eth_accounts', []);
+      if (!accounts?.length) {
+        router.push('/auth/wallet');
+        return;
+      }
+      const addr = ethers.getAddress(accounts[0]);
+      setSenderAddress(addr);
+
+      const net = await provider.getNetwork();
+      setChainId(Number(net.chainId));
+
+      const bal = await provider.getBalance(addr);
+      setNativeBalance(bal);
+
+      if (selectedToken?.kind === 'erc20') {
+        const c = new ethers.Contract(selectedToken.address, ERC20_ABI, provider);
+        const b: bigint = await c.balanceOf(addr);
+        setTokenBalance(b);
+      } else {
+        setTokenBalance(0n);
+      }
+    } catch (error) {
+      console.error('Failed to refresh wallet state:', error);
+    }
+  };
 
   const loadPayments = async () => {
     try {
       const response = await fetch('/api/payments', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-
       if (response.ok) {
         const data = await response.json();
         setPayments(data.payments || []);
@@ -57,215 +110,377 @@ export default function PaymentsPage() {
     }
   };
 
-  const handlePayment = async () => {
+  useEffect(() => {
+    if (!user || !token) return;
+    loadPayments();
+  }, [user, token]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    refreshWalletState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTokenKey]);
+
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Copied');
+    } catch {
+      toast.error('Failed to copy');
+    }
+  };
+
+  const ensureCorrectNetwork = async (provider: ethers.BrowserProvider) => {
+    const expectedChainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 80002);
+    const net = await provider.getNetwork();
+    if (Number(net.chainId) === expectedChainId) return true;
+
+    toast.error(`Wrong network. Please switch to chain ${expectedChainId}.`);
+    return false;
+  };
+
+  const handleSend = async () => {
     if (!user || !token) {
       toast.error('Please connect your wallet first');
       return;
     }
 
-    if (!recipientAddress || !ethers.isAddress(recipientAddress)) {
-      toast.error('Please enter a valid wallet address');
+    if (!selectedToken) {
+      toast.error('Select a token');
       return;
     }
 
-    if (!amount || parseFloat(amount) <= 0) {
-      toast.error('Please enter a valid amount');
+    if (!recipientAddress || !ethers.isAddress(recipientAddress)) {
+      toast.error('Enter a valid recipient address');
+      return;
+    }
+
+    if (!amount || Number(amount) <= 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+
+    const provider = getProvider();
+    if (!provider) {
+      toast.error('No wallet detected (MetaMask)');
       return;
     }
 
     try {
       setLoading(true);
-      toast.loading('Processing payment...', { id: 'payment' });
+      toast.loading('Preparing transaction…', { id: 'payment' });
 
-      // Get provider based on platform
-      let provider: ethers.BrowserProvider | null = null;
-      
-      if (paymentPlatform === 'metamask') {
-        if (typeof window !== 'undefined' && (window as any).ethereum) {
-          provider = new ethers.BrowserProvider((window as any).ethereum);
-        } else {
-          toast.error('MetaMask not found. Please install MetaMask.', { id: 'payment' });
-          setLoading(false);
-          return;
-        }
-      } else {
-        toast.error(`${paymentPlatform} integration coming soon`, { id: 'payment' });
+      const okNetwork = await ensureCorrectNetwork(provider);
+      if (!okNetwork) {
         setLoading(false);
+        toast.dismiss('payment');
         return;
       }
 
-      // Request account access
       await provider.send('eth_requestAccounts', []);
       const signer = await provider.getSigner();
-      const senderAddress = await signer.getAddress();
+      const from = await signer.getAddress();
 
-      // Convert amount to wei
-      const amountWei = ethers.parseEther(amount);
+      const to = ethers.getAddress(recipientAddress);
 
-      // Send transaction
-      const tx = await signer.sendTransaction({
-        to: recipientAddress,
-        value: amountWei,
-      });
+      let txHash: string;
+      let amountBaseUnits: bigint;
+      let tokenAddress: string | null = null;
+      let tokenSymbol: string = selectedToken.symbol;
 
-      toast.loading('Waiting for confirmation...', { id: 'payment' });
-      const receipt = await tx.wait();
+      if (selectedToken.kind === 'native') {
+        amountBaseUnits = ethers.parseEther(amount);
+        toast.loading(`Sending ${amount} ${selectedToken.symbol}…`, { id: 'payment' });
+        const tx = await signer.sendTransaction({ to, value: amountBaseUnits });
+        const receipt = await tx.wait();
+        if (!receipt) throw new Error('Transaction not confirmed');
+        txHash = receipt.hash;
+      } else {
+        const c = new ethers.Contract(selectedToken.address, ERC20_ABI, signer);
+        const decimals: number = selectedToken.decimals ?? Number(await c.decimals());
+        tokenSymbol = (await c.symbol()).toString() || selectedToken.symbol;
+        amountBaseUnits = ethers.parseUnits(amount, decimals);
+        tokenAddress = selectedToken.address;
 
-      if (!receipt) {
-        toast.error('Transaction receipt not received', { id: 'payment' });
-        setLoading(false);
-        return;
+        toast.loading(`Sending ${amount} ${tokenSymbol}…`, { id: 'payment' });
+        const tx = await c.transfer(to, amountBaseUnits);
+        const receipt = await tx.wait();
+        if (!receipt) throw new Error('Transaction not confirmed');
+        txHash = receipt.hash;
       }
 
-      // Record payment in database
-      const response = await fetch('/api/payments/record', {
+      toast.loading('Verifying on Amoy…', { id: 'payment' });
+
+      const recordResponse = await fetch('/api/payments/record', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          transactionHash: receipt.hash,
-          amount: amountWei.toString(),
-          recipientAddress,
-          paymentPlatform,
+          transactionHash: txHash,
+          amount: amountBaseUnits.toString(),
+          recipientAddress: to,
+          paymentPlatform: 'metamask',
+          tokenAddress,
+          tokenSymbol,
+          chainId: chainId ?? undefined,
+          fromAddress: from,
         }),
       });
 
-      if (response.ok) {
-        toast.success('Payment successful!', { id: 'payment' });
-        loadPayments();
-        setRecipientAddress('');
-        setAmount('0.01');
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Failed to record payment', { id: 'payment' });
+      const data = await recordResponse.json().catch(() => ({}));
+      if (!recordResponse.ok) {
+        throw new Error(data.error || 'Failed to record payment');
       }
+
+      if (data?.payment?.status === 'failed') {
+        toast.error('Verification failed', { id: 'payment' });
+      } else {
+        toast.success('Payment confirmed!', { id: 'payment' });
+      }
+
+      setRecipientAddress('');
+      setAmount(selectedToken.kind === 'native' ? '0.01' : '1');
+      await loadPayments();
+      await refreshWalletState();
     } catch (error: any) {
       console.error('Payment error:', error);
-      toast.error(error.message || 'Payment failed. Please try again.', { id: 'payment' });
+      toast.error(error?.message || 'Payment failed', { id: 'payment' });
     } finally {
       setLoading(false);
     }
   };
 
+  const explorerBase =
+    Number(process.env.NEXT_PUBLIC_CHAIN_ID || 80002) === 80002
+      ? 'https://amoy.polygonscan.com'
+      : 'https://polygonscan.com';
+
+  const balanceLine = useMemo(() => {
+    if (!selectedToken) return '';
+    if (selectedToken.kind === 'native') {
+      return `${formatAmount(nativeBalance, 18, 6)} ${selectedToken.symbol}`;
+    }
+    const dec = selectedToken.decimals ?? 18;
+    return `${formatAmount(tokenBalance, dec, 6)} ${selectedToken.symbol}`;
+  }, [selectedToken, nativeBalance, tokenBalance]);
+
   return (
-    <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen mesh-bg">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
-        <div className="flex items-center space-x-3">
+      <div className="glass-card border-b border-gray-200/30 dark:border-gray-700/30 sticky top-0 z-20">
+        <div className="max-w-3xl mx-auto flex items-center justify-between p-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push('/chats')}
+              className="p-2.5 hover:bg-gray-100/80 dark:hover:bg-gray-700/80 rounded-xl transition-all active:scale-95"
+              title="Back"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                <Wallet className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold gradient-text">Payments</h1>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {chainId ? `Chain ${chainId}` : 'Wallet'}
+                  {senderAddress ? ` • ${senderAddress.slice(0, 6)}…${senderAddress.slice(-4)}` : ''}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <button
-            onClick={() => router.push('/chats')}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+            onClick={refreshWalletState}
+            className="px-3 py-2 rounded-xl bg-white/60 dark:bg-gray-900/40 hover:bg-white/80 dark:hover:bg-gray-900/60 text-sm font-semibold text-gray-800 dark:text-gray-100 transition-all active:scale-95"
           >
-            <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            Refresh
           </button>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Payments</h1>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {/* Payment Form */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Make a Payment
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Recipient Wallet Address
-              </label>
-              <input
-                type="text"
-                value={recipientAddress}
-                onChange={(e) => setRecipientAddress(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="0x..."
-              />
+      <div className="max-w-3xl mx-auto p-4 space-y-4">
+        {/* Send Card */}
+        <div className="glass-card rounded-3xl overflow-hidden">
+          <div className="px-6 py-5 bg-gradient-to-r from-emerald-600/10 to-teal-600/10 dark:from-emerald-600/20 dark:to-teal-600/10 border-b border-gray-200/30 dark:border-gray-700/30">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <Coins className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">Send</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Direct wallet-to-wallet transfer</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Balance</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white">{balanceLine}</p>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Amount (MATIC)
-              </label>
-              <input
-                type="number"
-                step="0.001"
-                min="0.001"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="0.01"
-              />
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Token</label>
+                <select
+                  value={selectedTokenKey}
+                  onChange={(e) => setSelectedTokenKey(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-100/80 dark:bg-gray-800/80 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all"
+                >
+                  {tokens.map((t) => (
+                    <option key={t.symbol} value={t.symbol}>
+                      {t.symbol} {t.kind === 'erc20' ? '• ERC-20' : '• Native'}
+                    </option>
+                  ))}
+                </select>
+                {selectedToken?.kind === 'erc20' && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 font-mono">
+                    {selectedToken.address.slice(0, 10)}…{selectedToken.address.slice(-8)}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Amount</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.000001"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-100/80 dark:bg-gray-800/80 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all"
+                  placeholder="0.00"
+                />
+                <div className="flex gap-2 mt-2">
+                  {['0.01', '0.1', '1'].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setAmount(v)}
+                      className="px-3 py-1.5 rounded-xl bg-white/60 dark:bg-gray-900/40 hover:bg-white/80 dark:hover:bg-gray-900/60 text-xs font-semibold text-gray-800 dark:text-gray-100 transition-all active:scale-95"
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Payment Platform
-              </label>
-              <select
-                value={paymentPlatform}
-                onChange={(e) => setPaymentPlatform(e.target.value as any)}
-                className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="metamask">MetaMask</option>
-                <option value="walletconnect">WalletConnect</option>
-                <option value="privy">Privy</option>
-                <option value="magic">Magic Link</option>
-              </select>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Recipient</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={recipientAddress}
+                  onChange={(e) => setRecipientAddress(e.target.value.trim())}
+                  className="flex-1 px-4 py-3 bg-gray-100/80 dark:bg-gray-800/80 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all font-mono text-sm"
+                  placeholder="0x..."
+                />
+                <button
+                  type="button"
+                  onClick={() => handleCopy(recipientAddress)}
+                  disabled={!recipientAddress}
+                  className="px-4 py-3 rounded-2xl bg-white/60 dark:bg-gray-900/40 hover:bg-white/80 dark:hover:bg-gray-900/60 text-gray-800 dark:text-gray-100 transition-all active:scale-95 disabled:opacity-50"
+                  title="Copy"
+                >
+                  <Copy className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Tip: open a contact profile to copy their wallet address.
+              </p>
             </div>
+
             <button
-              onClick={handlePayment}
-              disabled={loading || !user || !recipientAddress || !amount}
-              className="w-full flex items-center justify-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleSend}
+              disabled={loading || !recipientAddress || !amount || !selectedToken}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold shadow-lg hover:shadow-xl transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Wallet className="w-5 h-5" />
-              <span>{loading ? 'Processing...' : `Pay ${amount} MATIC`}</span>
+              {loading ? 'Processing…' : `Send ${amount} ${selectedToken?.symbol || ''}`}
             </button>
+
+            <div className="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <ShieldCheck className="w-4 h-4 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+              <p>
+                Payments are verified against your configured network RPC (default Amoy).
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Payment History */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Payment History
-          </h2>
-          {payments.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400 text-center py-8">
-              No payments yet
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {payments.map((payment) => (
-                <div
-                  key={payment.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {payment.amount ? `${(Number(payment.amount) / 1e18).toFixed(4)} MATIC` : 'N/A'}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {payment.status} • {new Date(payment.created_at).toLocaleString()}
-                    </p>
-                    {payment.transaction_hash && (
-                      <a
-                        href={`https://amoy.polygonscan.com/tx/${payment.transaction_hash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
-                      >
-                        View on PolygonScan
-                      </a>
-                    )}
-                  </div>
-                  <Wallet className="w-5 h-5 text-primary-600 dark:text-primary-400" />
-                </div>
-              ))}
-            </div>
-          )}
+        {/* History */}
+        <div className="glass-card rounded-3xl overflow-hidden">
+          <div className="px-6 py-5 bg-gradient-to-r from-violet-600/10 to-purple-600/10 dark:from-violet-600/20 dark:to-purple-600/10 border-b border-gray-200/30 dark:border-gray-700/30">
+            <p className="font-bold text-gray-900 dark:text-white">History</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Last 50 payments</p>
+          </div>
+
+          <div className="p-3">
+            {payments.length === 0 ? (
+              <div className="p-8 text-center text-gray-600 dark:text-gray-400 font-medium">No payments yet</div>
+            ) : (
+              <div className="space-y-2">
+                {payments.map((p) => {
+                  const sym = p.token_symbol || process.env.NEXT_PUBLIC_NATIVE_SYMBOL || 'MATIC';
+                  const isErc20 = !!p.token_address;
+                  const dec =
+                    sym === 'USDC' || sym === 'USDT' ? 6 : 18;
+                  const amt = (() => {
+                    try {
+                      return formatAmount(BigInt(p.amount || '0'), dec, 6);
+                    } catch {
+                      return '0';
+                    }
+                  })();
+
+                  return (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl hover:bg-white/40 dark:hover:bg-gray-900/30 transition-all"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-900 dark:text-white">
+                          {amt} {sym}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate font-mono">
+                          to {String(p.recipient_address || '').slice(0, 10)}…{String(p.recipient_address || '').slice(-8)}
+                          {isErc20 ? ' • ERC-20' : ''}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {p.status} • {p.createdAt ? new Date(p.createdAt).toLocaleString() : ''}
+                        </p>
+                      </div>
+                      {p.transaction_hash && (
+                        <a
+                          className="px-3 py-2 rounded-xl bg-white/60 dark:bg-gray-900/40 hover:bg-white/80 dark:hover:bg-gray-900/60 text-gray-900 dark:text-white text-sm font-semibold transition-all active:scale-95 flex items-center gap-2"
+                          href={`${explorerBase}/tx/${p.transaction_hash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <span>Tx</span>
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
+export default function PaymentsPage() {
+  return (
+    <Suspense>
+      <PaymentsInner />
+    </Suspense>
+  );
+}

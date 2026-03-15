@@ -56,6 +56,50 @@ export async function verifyTransaction(
 }
 
 /**
+ * Verify an ERC-20 transfer by decoding receipt logs and finding a matching Transfer event.
+ * This verifies receipt success, token contract address, and (from,to,value) of at least one Transfer log.
+ */
+export async function verifyErc20Transfer(
+  txHash: string,
+  tokenAddress: string,
+  expectedFrom: string,
+  expectedTo: string,
+  expectedAmount: bigint
+): Promise<boolean> {
+  try {
+    const provider = getProvider();
+    const receipt = await provider.getTransactionReceipt(txHash);
+    if (!receipt || receipt.status !== 1) return false;
+
+    const normalizedToken = tokenAddress.toLowerCase();
+    const normalizedFrom = expectedFrom.toLowerCase();
+    const normalizedTo = expectedTo.toLowerCase();
+
+    const transferTopic = ethers.id('Transfer(address,address,uint256)');
+
+    for (const log of receipt.logs) {
+      if (!log?.topics?.length) continue;
+      if (String(log.address).toLowerCase() !== normalizedToken) continue;
+      if (log.topics[0] !== transferTopic) continue;
+
+      // topics[1] = from, topics[2] = to (both indexed)
+      const from = ethers.getAddress(`0x${log.topics[1].slice(26)}`).toLowerCase();
+      const to = ethers.getAddress(`0x${log.topics[2].slice(26)}`).toLowerCase();
+      const value = BigInt(log.data);
+
+      if (from === normalizedFrom && to === normalizedTo && value === expectedAmount) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    console.error('ERC20 transfer verification error:', error);
+    return false;
+  }
+}
+
+/**
  * Get transaction details
  */
 export async function getTransactionDetails(txHash: string) {

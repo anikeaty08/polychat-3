@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore, useChatStore } from '@/lib/store';
-import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Smile, Check, CheckCheck, File, Download, X, Trash2, Forward, Shield, Mic, Square, Camera, Lock, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Send, Smile, Check, CheckCheck, File, Download, X, Trash2, Forward, Shield, Mic, Square, Camera, Lock, Eye, EyeOff, Wallet } from 'lucide-react';
 import { formatMessageTime, formatLastSeen } from '@/lib/utils';
 import Image from 'next/image';
 import { io, Socket } from 'socket.io-client';
@@ -34,6 +34,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   const [isIncomingCall, setIsIncomingCall] = useState(false);
   const [isCalling, setIsCalling] = useState(false);
   const [currentCall, setCurrentCall] = useState<any>(null);
+  const [callOffer, setCallOffer] = useState<RTCSessionDescriptionInit | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showChatMenu, setShowChatMenu] = useState(false);
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
@@ -304,6 +305,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
         setIsIncomingCall(true);
         setIsCallOpen(true);
         setCurrentCall({ id: data.callId, caller_id: data.callerId });
+        setCallOffer(data.offer || null);
       }
     });
 
@@ -319,6 +321,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       if (data.conversationId === conversationId) {
         setIsCallOpen(false);
         setCurrentCall(null);
+        setCallOffer(null);
         toast('Call ended');
       }
     });
@@ -666,6 +669,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
         setIsCalling(true);
         setIsCallOpen(true);
         setCurrentCall(data.call);
+        setCallOffer(null);
         if (socket) {
           socket.emit('initiate_call', {
             conversationId,
@@ -716,6 +720,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
         setIsCalling(true);
         setIsCallOpen(true);
         setCurrentCall(data.call);
+        setCallOffer(null);
         if (socket) {
           socket.emit('initiate_call', {
             conversationId,
@@ -1291,6 +1296,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
           socket.emit('answer_call', {
             callId: currentCall.id,
             conversationId,
+            receiverId: participant?.id || currentCall.caller_id,
           });
         }
         toast.success('Call accepted!');
@@ -1323,6 +1329,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
           socket.emit('decline_call', {
             callId: currentCall.id,
             conversationId,
+            receiverId: participant?.id || currentCall.caller_id,
             declinerName: user?.displayName || user?.username || 'User',
           });
         }
@@ -1355,10 +1362,12 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
     setIsCallOpen(false);
     setCurrentCall(null);
+    setCallOffer(null);
     if (socket) {
       socket.emit('end_call', {
         callId: currentCall.id,
         conversationId,
+        receiverId: participant?.id || currentCall.caller_id,
       });
     }
   };
@@ -1440,6 +1449,20 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
               title={isBlocked ? 'Unblock user to make calls' : 'Video call'}
             >
               <Video className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            </button>
+            <button
+              onClick={() => {
+                const addr = participant?.wallet_address;
+                if (!addr) {
+                  toast.error('Wallet address not available');
+                  return;
+                }
+                router.push(`/payments?to=${addr}`);
+              }}
+              className="p-2.5 hover:bg-gray-100/80 dark:hover:bg-gray-700/80 rounded-xl transition-all active:scale-95"
+              title="Pay"
+            >
+              <Wallet className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             </button>
             <div className="relative">
               <button
@@ -1906,6 +1929,10 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
         isIncoming={isIncomingCall}
         isCalling={isCalling}
         callerName={participant?.display_name || participant?.username}
+        socket={socket}
+        callId={currentCall?.id}
+        remoteUserId={isIncomingCall ? currentCall?.caller_id : participant?.id}
+        initialOffer={callOffer}
         onAccept={handleAcceptCall}
         onDecline={handleDeclineCall}
         onEnd={handleEndCall}

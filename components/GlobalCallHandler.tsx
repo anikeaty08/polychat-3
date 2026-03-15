@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store';
 import { io, Socket } from 'socket.io-client';
@@ -10,36 +10,38 @@ import toast from 'react-hot-toast';
 export default function GlobalCallHandler() {
   const router = useRouter();
   const { user, token } = useAuthStore();
+
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isCallOpen, setIsCallOpen] = useState(false);
   const [callType, setCallType] = useState<'audio' | 'video'>('audio');
   const [isIncomingCall, setIsIncomingCall] = useState(false);
   const [currentCall, setCurrentCall] = useState<any>(null);
+  const currentCallRef = useRef<any>(null);
   const [callerInfo, setCallerInfo] = useState<any>(null);
+  const [callOffer, setCallOffer] = useState<RTCSessionDescriptionInit | null>(null);
+
+  useEffect(() => {
+    currentCallRef.current = currentCall;
+  }, [currentCall]);
 
   useEffect(() => {
     if (!user || !token) return;
 
     const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001', {
       auth: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
     });
 
     newSocket.on('connect', () => {
       console.log('Global socket connected');
     });
 
-    // Listen for incoming calls globally
-    newSocket.on('call_initiated', async (data) => {
-      console.log('Incoming call received:', data);
-      
-      // Fetch caller info
+    newSocket.on('call_initiated', async (data: any) => {
       try {
         const response = await fetch(`/api/profile/${data.callerId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
-        
         if (response.ok) {
           const callerData = await response.json();
           setCallerInfo(callerData.user);
@@ -51,47 +53,32 @@ export default function GlobalCallHandler() {
       setCallType(data.callType);
       setIsIncomingCall(true);
       setIsCallOpen(true);
+      setCallOffer(data.offer || null);
       setCurrentCall({
         id: data.callId,
         conversationId: data.conversationId,
         callerId: data.callerId,
       });
 
-      // Show notification
-      toast.success(`Incoming ${data.callType} call`, {
-        duration: 5000,
-      });
+      toast.success(`Incoming ${data.callType} call`, { duration: 5000 });
     });
 
-    newSocket.on('call_answered', (data) => {
-      if (currentCall?.id === data.callId) {
+    newSocket.on('call_answered', (data: any) => {
+      if (currentCallRef.current?.id === data.callId) {
         setIsIncomingCall(false);
-        toast.success('Call answered');
       }
     });
 
-    newSocket.on('call_ended', (data) => {
-      if (currentCall?.id === data.callId) {
+    newSocket.on('call_ended', (data: any) => {
+      if (currentCallRef.current?.id === data.callId) {
         setIsCallOpen(false);
         setCurrentCall(null);
         setCallerInfo(null);
-        toast('Call ended');
-      }
-    });
-
-    newSocket.on('call_declined', (data) => {
-      if (currentCall?.id === data.callId) {
-        setIsCallOpen(false);
-        setCurrentCall(null);
-        setCallerInfo(null);
-        toast(`${data.declinerName || 'User'} declined the call`, {
-          icon: '📞',
-        });
+        setCallOffer(null);
       }
     });
 
     setSocket(newSocket);
-
     return () => {
       newSocket.disconnect();
     };
@@ -99,8 +86,7 @@ export default function GlobalCallHandler() {
 
   const handleAcceptCall = async () => {
     if (!currentCall || !token) return;
-    
-    // Navigate to conversation if not already there
+
     if (currentCall.conversationId) {
       router.push(`/chats/${currentCall.conversationId}`);
     }
@@ -115,14 +101,13 @@ export default function GlobalCallHandler() {
         body: JSON.stringify({ status: 'answered' }),
       });
 
-      if (response.ok) {
+      if (response.ok && socket) {
         setIsIncomingCall(false);
-        if (socket) {
-          socket.emit('answer_call', {
-            callId: currentCall.id,
-            conversationId: currentCall.conversationId,
-          });
-        }
+        socket.emit('answer_call', {
+          callId: currentCall.id,
+          conversationId: currentCall.conversationId,
+          receiverId: currentCall.callerId,
+        });
       }
     } catch (error) {
       console.error('Accept call error:', error);
@@ -132,7 +117,7 @@ export default function GlobalCallHandler() {
 
   const handleDeclineCall = async () => {
     if (!currentCall || !token) return;
-    
+
     try {
       const response = await fetch(`/api/calls/${currentCall.id}`, {
         method: 'PATCH',
@@ -142,33 +127,29 @@ export default function GlobalCallHandler() {
         },
         body: JSON.stringify({ status: 'declined' }),
       });
-      
+
       if (response.ok) {
         setIsCallOpen(false);
         setCurrentCall(null);
         setCallerInfo(null);
-        
-        if (socket) {
-          socket.emit('decline_call', {
-            callId: currentCall.id,
-            conversationId: currentCall.conversationId,
-            declinerName: user?.displayName || user?.username || 'User',
-          });
-        }
-        
-        toast.success('Call declined');
-      } else {
-        toast.error('Failed to decline call. Please try again.');
+        setCallOffer(null);
+
+        socket?.emit('decline_call', {
+          callId: currentCall.id,
+          conversationId: currentCall.conversationId,
+          receiverId: currentCall.callerId,
+          declinerName: user?.displayName || user?.username || 'User',
+        });
       }
     } catch (error) {
       console.error('Decline call error:', error);
-      toast.error('Failed to decline call. Please try again.');
+      toast.error('Failed to decline call');
     }
   };
 
   const handleEndCall = async () => {
     if (!currentCall || !token) return;
-    
+
     try {
       await fetch(`/api/calls/${currentCall.id}`, {
         method: 'PATCH',
@@ -178,20 +159,20 @@ export default function GlobalCallHandler() {
         },
         body: JSON.stringify({ status: 'completed' }),
       });
-      
-      setIsCallOpen(false);
-      setCurrentCall(null);
-      setCallerInfo(null);
-      
-      if (socket) {
-        socket.emit('end_call', {
-          callId: currentCall.id,
-          conversationId: currentCall.conversationId,
-        });
-      }
     } catch (error) {
       console.error('End call error:', error);
     }
+
+    setIsCallOpen(false);
+    setCurrentCall(null);
+    setCallerInfo(null);
+    setCallOffer(null);
+
+    socket?.emit('end_call', {
+      callId: currentCall.id,
+      conversationId: currentCall.conversationId,
+      receiverId: currentCall.callerId,
+    });
   };
 
   if (!isCallOpen) return null;
@@ -202,10 +183,13 @@ export default function GlobalCallHandler() {
       callType={callType}
       isIncoming={isIncomingCall}
       callerName={callerInfo?.display_name || callerInfo?.username || 'Unknown'}
+      socket={socket}
+      callId={currentCall?.id}
+      remoteUserId={currentCall?.callerId}
+      initialOffer={callOffer}
       onAccept={handleAcceptCall}
       onDecline={handleDeclineCall}
       onEnd={handleEndCall}
     />
   );
 }
-

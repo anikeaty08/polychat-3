@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore, useChatStore } from '@/lib/store';
-import { MessageCircle, Phone, Settings, Search, Plus, MoreVertical, User, LogOut, Wallet, Circle, Shield, Lock, X } from 'lucide-react';
+import { MessageCircle, Phone, Settings, Search, Plus, MoreVertical, User, LogOut, Wallet, Circle, Shield, Lock, X, Mic, Video, FileText, Image as ImageIcon } from 'lucide-react';
 import { formatTime } from '@/lib/utils';
 import Image from 'next/image';
 import StatusTab from './StatusTab';
@@ -68,6 +68,19 @@ export default function ChatList() {
       newSocket.disconnect();
     };
   }, [user, token]);
+
+  useEffect(() => {
+    if (!socket) return;
+    (conversations || []).forEach((c: any) => {
+      if (c?.id) socket.emit('join_conversation', c.id);
+    });
+
+    return () => {
+      (conversations || []).forEach((c: any) => {
+        if (c?.id) socket.emit('leave_conversation', c.id);
+      });
+    };
+  }, [socket, conversations]);
 
   const loadConversations = async () => {
     try {
@@ -403,11 +416,29 @@ export default function ChatList() {
                     </div>
                     <div className="flex items-center space-x-2">
                       <p className="text-sm text-gray-600 dark:text-gray-400 truncate flex-1">
-                        {conversation.last_message?.message_type === 'audio' ? '🎤 Voice message' :
-                          conversation.last_message?.message_type === 'image' ? '📷 Photo' :
-                            conversation.last_message?.message_type === 'video' ? '🎥 Video' :
-                              conversation.last_message?.message_type === 'file' ? '📎 File' :
-                                conversation.last_message?.content || 'Start chatting...'}
+                        {conversation.last_message?.message_type === 'audio' ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Mic className="w-4 h-4" />
+                            <span>Voice message</span>
+                          </span>
+                        ) : conversation.last_message?.message_type === 'image' ? (
+                          <span className="inline-flex items-center gap-1">
+                            <ImageIcon className="w-4 h-4" />
+                            <span>Photo</span>
+                          </span>
+                        ) : conversation.last_message?.message_type === 'video' ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Video className="w-4 h-4" />
+                            <span>Video</span>
+                          </span>
+                        ) : conversation.last_message?.message_type === 'file' ? (
+                          <span className="inline-flex items-center gap-1">
+                            <FileText className="w-4 h-4" />
+                            <span>File</span>
+                          </span>
+                        ) : (
+                          conversation.last_message?.content || 'Start chatting...'
+                        )}
                       </p>
                       {conversation.unread_count > 0 && (
                         <span className="flex-shrink-0 bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg animate-pulse">

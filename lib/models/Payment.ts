@@ -4,7 +4,11 @@ const paymentSchema = new mongoose.Schema(
   {
     user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     transaction_hash: { type: String, unique: true },
+    from_address: String,
+    chain_id: Number,
     amount: String,
+    token_symbol: String,
+    token_address: String,
     status: { type: String, default: 'pending', enum: ['pending', 'confirmed', 'failed'] },
     verified_at: Date,
     recipient_address: String,

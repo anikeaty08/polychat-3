@@ -4,10 +4,13 @@ import { useState } from 'react';
 import { useAuthStore } from '@/lib/store';
 import toast from 'react-hot-toast';
 import { Wallet } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface PaymentButtonProps {
   amount: string; // in MATIC/ETH
   metadata?: string;
+  recipientAddress?: string;
+  tokenSymbol?: string;
   onSuccess?: (paymentId: string) => void;
   onError?: (error: string) => void;
 }
@@ -15,9 +18,12 @@ interface PaymentButtonProps {
 export default function PaymentButton({
   amount,
   metadata = '',
+  recipientAddress,
+  tokenSymbol,
   onSuccess,
   onError,
 }: PaymentButtonProps) {
+  const router = useRouter();
   const { user, token } = useAuthStore();
   const [loading, setLoading] = useState(false);
 
@@ -29,30 +35,18 @@ export default function PaymentButton({
 
     try {
       setLoading(true);
-      toast.loading('Processing payment...', { id: 'payment' });
+      const params = new URLSearchParams();
+      params.set('amount', amount);
+      if (recipientAddress) params.set('to', recipientAddress);
+      if (tokenSymbol) params.set('token', tokenSymbol);
+      if (metadata) params.set('metadata', metadata);
 
-      // Server handles payment creation and verification
-      const response = await fetch('/api/payments/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ amount, metadata }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        toast.success('Payment successful!', { id: 'payment' });
-        onSuccess?.(data.payment.paymentId);
-      } else {
-        toast.error(data.error || 'Payment failed', { id: 'payment' });
-        onError?.(data.error || 'Payment failed');
-      }
+      router.push(`/payments?${params.toString()}`);
+      toast.success('Open payments to complete the transfer');
+      onSuccess?.('redirect');
     } catch (error: any) {
       console.error('Payment error:', error);
-      toast.error('Payment failed. Please try again.', { id: 'payment' });
+      toast.error('Unable to open payments');
       onError?.(error.message || 'Payment failed');
     } finally {
       setLoading(false);
@@ -66,7 +60,7 @@ export default function PaymentButton({
       className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <Wallet className="w-4 h-4" />
-      <span>{loading ? 'Processing...' : `Pay ${amount} MATIC`}</span>
+      <span>{loading ? 'Opening...' : `Pay ${amount}`}</span>
     </button>
   );
 }
