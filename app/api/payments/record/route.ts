@@ -13,16 +13,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const payload = verifyToken(token);
-    const {
-      transactionHash,
-      amount,
-      recipientAddress,
-      paymentPlatform,
-      tokenAddress,
-      tokenSymbol,
-      chainId,
-    } = await req.json();
+  const payload = verifyToken(token);
+  const {
+    transactionHash,
+    amount,
+    recipientAddress,
+    paymentPlatform,
+    tokenAddress,
+    tokenSymbol,
+    chainId,
+  } = await req.json();
 
     if (!transactionHash || !amount || !recipientAddress) {
       return NextResponse.json(
@@ -38,8 +38,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid recipient address' }, { status: 400 });
     }
 
-    const expectedChainId = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || '80002');
-    if (chainId && Number(chainId) !== expectedChainId) {
+    const supported = new Set([80002, 137]);
+    const parsedChainId = chainId ? Number(chainId) : NaN;
+    if (!Number.isFinite(parsedChainId) || !supported.has(parsedChainId)) {
       return NextResponse.json({ error: 'Unsupported network' }, { status: 400 });
     }
 
@@ -53,9 +54,13 @@ export async function POST(req: NextRequest) {
       recipient_address: recipientAddress,
       payment_platform: paymentPlatform || 'metamask',
       from_address: payload.walletAddress,
-      chain_id: expectedChainId,
+      chain_id: parsedChainId,
       token_address: tokenAddress || null,
-      token_symbol: tokenSymbol || (tokenAddress ? 'ERC20' : (process.env.NEXT_PUBLIC_NATIVE_SYMBOL || 'MATIC')),
+      token_symbol:
+        tokenSymbol ||
+        (tokenAddress
+          ? 'ERC20'
+          : process.env.NEXT_PUBLIC_NATIVE_SYMBOL || 'MATIC'),
     });
 
     let isValid = false;
@@ -69,14 +74,16 @@ export async function POST(req: NextRequest) {
           tokenAddress,
           payload.walletAddress,
           recipientAddress,
-          BigInt(amount.toString())
+          BigInt(amount.toString()),
+          parsedChainId
         );
       } else {
         isValid = await verifyTransaction(
           transactionHash,
           payload.walletAddress,
           recipientAddress,
-          BigInt(amount.toString())
+          BigInt(amount.toString()),
+          parsedChainId
         );
       }
     } catch (error) {

@@ -11,6 +11,7 @@
     "socket": "node server/socket-server.js"
   },
   "dependencies": {
+    "@walletconnect/ethereum-provider": "^2.23.8",
     "axios": "^1.6.5",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",

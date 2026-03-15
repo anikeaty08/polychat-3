@@ -62,12 +62,12 @@ export default function BlockedUsers() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+    <div className="min-h-screen mesh-bg">
+      <div className="glass-card border-b border-gray-200/30 dark:border-gray-700/30 sticky top-0 z-10">
         <div className="flex items-center space-x-3 p-4">
           <button
             onClick={() => router.push('/settings')}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+            className="p-2.5 hover:bg-gray-100/80 dark:hover:bg-gray-700/80 rounded-xl transition-all active:scale-95"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
           </button>
@@ -75,8 +75,8 @@ export default function BlockedUsers() {
         </div>
       </div>
 
-      <div className="p-4">
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+      <div className="p-4 max-w-2xl mx-auto">
+        <div className="glass-card border border-blue-200/40 dark:border-blue-800/40 rounded-3xl p-4 mb-4">
           <div className="flex items-start space-x-2">
             <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
             <div>
@@ -114,10 +114,10 @@ export default function BlockedUsers() {
               {blockedUsers.map((blocked) => (
                 <div
                   key={blocked.id}
-                  className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700"
+                  className="glass-card rounded-3xl p-4 border border-gray-200/30 dark:border-gray-700/30"
                 >
                   <div className="flex items-center space-x-3 mb-3">
-                    <div className="relative w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-600 flex-shrink-0 overflow-hidden">
+                    <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-400 to-purple-600 flex-shrink-0 overflow-hidden shadow-lg shadow-violet-500/20">
                       {blocked.user?.profile_picture ? (
                         <Image
                           src={blocked.user.profile_picture}
@@ -127,7 +127,7 @@ export default function BlockedUsers() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <span className="text-gray-600 dark:text-gray-400">
+                          <span className="text-white font-bold text-lg">
                             {blocked.user?.username?.[0]?.toUpperCase() || 'U'}
                           </span>
                         </div>
@@ -147,7 +147,7 @@ export default function BlockedUsers() {
                   </div>
                   <button
                     onClick={() => handleUnblock(blocked.user.id)}
-                    className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg"
+                    className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-semibold py-2.5 px-4 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95"
                   >
                     Unblock
                   </button>

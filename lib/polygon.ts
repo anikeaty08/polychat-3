@@ -1,26 +1,40 @@
 import { ethers } from 'ethers';
 
-const POLYGON_AMOY_RPC = process.env.NEXT_PUBLIC_POLYGON_AMOY_RPC || 'https://rpc-amoy.polygon.technology';
-const CHAIN_ID = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || '80002');
-
-/**
- * Get Polygon Amoy provider
- */
-export function getProvider() {
-  return new ethers.JsonRpcProvider(POLYGON_AMOY_RPC);
+function getRpcUrl(chainId?: number): string {
+  if (chainId === 137) {
+    return (
+      process.env.POLYGON_MAINNET_RPC ||
+      process.env.NEXT_PUBLIC_POLYGON_MAINNET_RPC ||
+      ''
+    );
+  }
+  // default to Amoy (80002)
+  return process.env.NEXT_PUBLIC_POLYGON_AMOY_RPC || 'https://rpc-amoy.polygon.technology';
 }
 
 /**
- * Verify transaction on Polygon Amoy
+ * Get provider for a given chain.
+ */
+export function getProvider(chainId?: number) {
+  const url = getRpcUrl(chainId);
+  if (!url) {
+    throw new Error('RPC URL not configured for selected chain');
+  }
+  return new ethers.JsonRpcProvider(url);
+}
+
+/**
+ * Verify transaction on selected chain
  */
 export async function verifyTransaction(
   txHash: string,
   expectedFrom: string,
   expectedTo?: string,
-  expectedValue?: bigint
+  expectedValue?: bigint,
+  chainId?: number
 ): Promise<boolean> {
   try {
-    const provider = getProvider();
+    const provider = getProvider(chainId);
     const tx = await provider.getTransaction(txHash);
 
     if (!tx) {
@@ -64,10 +78,11 @@ export async function verifyErc20Transfer(
   tokenAddress: string,
   expectedFrom: string,
   expectedTo: string,
-  expectedAmount: bigint
+  expectedAmount: bigint,
+  chainId?: number
 ): Promise<boolean> {
   try {
-    const provider = getProvider();
+    const provider = getProvider(chainId);
     const receipt = await provider.getTransactionReceipt(txHash);
     if (!receipt || receipt.status !== 1) return false;
 

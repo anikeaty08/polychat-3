@@ -7,6 +7,7 @@ import { getPaymentTokens, type PaymentToken } from '@/lib/tokens';
 import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Coins, Copy, ExternalLink, ShieldCheck, Wallet } from 'lucide-react';
+import NetworkSwitcher, { type SupportedChainId } from '@/components/NetworkSwitcher';
 
 const ERC20_ABI = [
   'function decimals() view returns (uint8)',
@@ -27,8 +28,7 @@ function PaymentsInner() {
   const searchParams = useSearchParams();
   const { user, token } = useAuthStore();
 
-  const tokens = useMemo(() => getPaymentTokens(), []);
-  const [selectedTokenKey, setSelectedTokenKey] = useState<string>(tokens[0]?.symbol || 'MATIC');
+  const [selectedTokenKey, setSelectedTokenKey] = useState<string>('MATIC');
 
   const [payments, setPayments] = useState<any[]>([]);
   const [recipientAddress, setRecipientAddress] = useState('');
@@ -38,6 +38,16 @@ function PaymentsInner() {
   const [nativeBalance, setNativeBalance] = useState<bigint>(0n);
   const [tokenBalance, setTokenBalance] = useState<bigint>(0n);
   const [chainId, setChainId] = useState<number | null>(null);
+  const [preferredChainId, setPreferredChainId] = useState<SupportedChainId>(80002);
+
+  const tokens = useMemo(() => getPaymentTokens(chainId), [chainId]);
+
+  useEffect(() => {
+    if (!tokens.length) return;
+    if (!tokens.some((t) => t.symbol === selectedTokenKey)) {
+      setSelectedTokenKey(tokens[0].symbol);
+    }
+  }, [tokens, selectedTokenKey]);
 
   const selectedToken: PaymentToken | undefined = useMemo(
     () => tokens.find((t) => t.symbol === selectedTokenKey) || tokens[0],
@@ -50,12 +60,19 @@ function PaymentsInner() {
       return;
     }
 
+    try {
+      const saved = window.localStorage.getItem('polychat-preferred-chain');
+      if (saved === '137' || saved === '80002') setPreferredChainId(Number(saved) as SupportedChainId);
+    } catch {
+      // ignore
+    }
+
     const to = searchParams.get('to');
     if (to && ethers.isAddress(to)) setRecipientAddress(to);
     const a = searchParams.get('amount');
     if (a && !Number.isNaN(Number(a))) setAmount(a);
     const sym = searchParams.get('token');
-    if (sym && tokens.some((t) => t.symbol === sym)) setSelectedTokenKey(sym);
+    if (sym) setSelectedTokenKey(sym);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, token]);
 
@@ -130,13 +147,60 @@ function PaymentsInner() {
     }
   };
 
-  const ensureCorrectNetwork = async (provider: ethers.BrowserProvider) => {
-    const expectedChainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 80002);
-    const net = await provider.getNetwork();
-    if (Number(net.chainId) === expectedChainId) return true;
+  const getChainLabel = (id: number | null) => {
+    if (id === 137) return 'Polygon Mainnet';
+    if (id === 80002) return 'Polygon Amoy';
+    return id ? `Chain ${id}` : 'Wallet';
+  };
 
-    toast.error(`Wrong network. Please switch to chain ${expectedChainId}.`);
-    return false;
+  const switchChain = async (targetChainId: number) => {
+    const eth = (window as any).ethereum;
+    if (!eth?.request) return false;
+    const hex = `0x${targetChainId.toString(16)}`;
+    try {
+      await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: hex }] });
+      return true;
+    } catch (error: any) {
+      // If the chain is not added, try to add it (best-effort)
+      if (error?.code === 4902) {
+        try {
+          if (targetChainId === 137) {
+            await eth.request({
+              method: 'wallet_addEthereumChain',
+              params: [
+                {
+                  chainId: hex,
+                  chainName: 'Polygon Mainnet',
+                  nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
+                  rpcUrls: [process.env.NEXT_PUBLIC_POLYGON_MAINNET_RPC || 'https://polygon-rpc.com'],
+                  blockExplorerUrls: ['https://polygonscan.com'],
+                },
+              ],
+            });
+            return true;
+          }
+          if (targetChainId === 80002) {
+            await eth.request({
+              method: 'wallet_addEthereumChain',
+              params: [
+                {
+                  chainId: hex,
+                  chainName: 'Polygon Amoy',
+                  nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
+                  rpcUrls: [process.env.NEXT_PUBLIC_POLYGON_AMOY_RPC || 'https://rpc-amoy.polygon.technology'],
+                  blockExplorerUrls: ['https://amoy.polygonscan.com'],
+                },
+              ],
+            });
+            return true;
+          }
+        } catch (addError) {
+          console.error('Add chain failed:', addError);
+        }
+      }
+      console.error('Switch chain failed:', error);
+      return false;
+    }
   };
 
   const handleSend = async () => {
@@ -170,10 +234,23 @@ function PaymentsInner() {
       setLoading(true);
       toast.loading('Preparing transaction…', { id: 'payment' });
 
-      const okNetwork = await ensureCorrectNetwork(provider);
-      if (!okNetwork) {
+      const net = await provider.getNetwork();
+      const currentChain = Number(net.chainId);
+      if (currentChain !== preferredChainId) {
+        toast.loading('Switching network…', { id: 'payment' });
+        const switched = await switchChain(preferredChainId);
+        if (!switched) {
+          toast.error('Network switch failed', { id: 'payment' });
+          setLoading(false);
+          return;
+        }
+      }
+
+      const net2 = await provider.getNetwork();
+      const currentChain2 = Number(net2.chainId);
+      if (currentChain2 !== 137 && currentChain2 !== 80002) {
+        toast.error('Unsupported network. Switch to Polygon Mainnet or Amoy.', { id: 'payment' });
         setLoading(false);
-        toast.dismiss('payment');
         return;
       }
 
@@ -224,7 +301,7 @@ function PaymentsInner() {
           paymentPlatform: 'metamask',
           tokenAddress,
           tokenSymbol,
-          chainId: chainId ?? undefined,
+          chainId: currentChain2,
           fromAddress: from,
         }),
       });
@@ -252,10 +329,7 @@ function PaymentsInner() {
     }
   };
 
-  const explorerBase =
-    Number(process.env.NEXT_PUBLIC_CHAIN_ID || 80002) === 80002
-      ? 'https://amoy.polygonscan.com'
-      : 'https://polygonscan.com';
+  const explorerBase = chainId === 80002 ? 'https://amoy.polygonscan.com' : 'https://polygonscan.com';
 
   const balanceLine = useMemo(() => {
     if (!selectedToken) return '';
@@ -286,19 +360,34 @@ function PaymentsInner() {
               <div>
                 <h1 className="text-xl font-bold gradient-text">Payments</h1>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {chainId ? `Chain ${chainId}` : 'Wallet'}
+                  {getChainLabel(chainId)}
                   {senderAddress ? ` • ${senderAddress.slice(0, 6)}…${senderAddress.slice(-4)}` : ''}
                 </p>
               </div>
             </div>
           </div>
 
-          <button
-            onClick={refreshWalletState}
-            className="px-3 py-2 rounded-xl bg-white/60 dark:bg-gray-900/40 hover:bg-white/80 dark:hover:bg-gray-900/60 text-sm font-semibold text-gray-800 dark:text-gray-100 transition-all active:scale-95"
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <NetworkSwitcher
+              value={preferredChainId}
+              onChange={(id) => {
+                setPreferredChainId(id);
+                try {
+                  window.localStorage.setItem('polychat-preferred-chain', String(id));
+                } catch {
+                  // ignore
+                }
+                switchChain(id).finally(() => refreshWalletState());
+              }}
+            />
+            <button
+              onClick={refreshWalletState}
+              className="px-3 py-2 rounded-xl bg-white/60 dark:bg-gray-900/40 hover:bg-white/80 dark:hover:bg-gray-900/60 text-sm font-semibold text-gray-800 dark:text-gray-100 transition-all active:scale-95"
+              title="Refresh"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 
@@ -429,6 +518,7 @@ function PaymentsInner() {
                   const isErc20 = !!p.token_address;
                   const dec =
                     sym === 'USDC' || sym === 'USDT' ? 6 : 18;
+                  const txExplorerBase = Number(p.chain_id) === 80002 ? 'https://amoy.polygonscan.com' : 'https://polygonscan.com';
                   const amt = (() => {
                     try {
                       return formatAmount(BigInt(p.amount || '0'), dec, 6);
@@ -457,7 +547,7 @@ function PaymentsInner() {
                       {p.transaction_hash && (
                         <a
                           className="px-3 py-2 rounded-xl bg-white/60 dark:bg-gray-900/40 hover:bg-white/80 dark:hover:bg-gray-900/60 text-gray-900 dark:text-white text-sm font-semibold transition-all active:scale-95 flex items-center gap-2"
-                          href={`${explorerBase}/tx/${p.transaction_hash}`}
+                          href={`${txExplorerBase}/tx/${p.transaction_hash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                         >

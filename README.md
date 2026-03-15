@@ -142,6 +142,8 @@ npm run dev
 1. **MongoDB** - Use [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) or local MongoDB
 2. **Pinata** - Get API keys at [pinata.cloud](https://pinata.cloud)
 3. **Configure `.env`** with your credentials (set `MONGODB_URI`)
+4. **WalletConnect (mobile)** - Set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
+5. **Polygon mainnet verification** - Set `POLYGON_MAINNET_RPC` (server-side)
 
 ### Environment Variables (Important)
 
@@ -160,10 +162,18 @@ npm run dev
 
 **Optional ERC-20 token addresses (for direct token payments):**
 
-- `NEXT_PUBLIC_NATIVE_SYMBOL` (default `MATIC`)
-- `NEXT_PUBLIC_TOKEN_USDC_ADDRESS`
-- `NEXT_PUBLIC_TOKEN_USDT_ADDRESS`
-- `NEXT_PUBLIC_TOKEN_DAI_ADDRESS`
+- `NEXT_PUBLIC_POLYGON_NATIVE_SYMBOL` (default `POL`)
+- `NEXT_PUBLIC_AMOY_NATIVE_SYMBOL` (default `MATIC`)
+- `NEXT_PUBLIC_POLYGON_TOKEN_USDC_ADDRESS` (optional override)
+- `NEXT_PUBLIC_POLYGON_TOKEN_USDT_ADDRESS` (optional override)
+- `NEXT_PUBLIC_POLYGON_TOKEN_DAI_ADDRESS` (optional override)
+- `NEXT_PUBLIC_AMOY_TOKEN_USDC_ADDRESS`
+- `NEXT_PUBLIC_AMOY_TOKEN_USDT_ADDRESS`
+- `NEXT_PUBLIC_AMOY_TOKEN_DAI_ADDRESS`
+
+**WalletConnect (mobile support):**
+
+- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
 
 **Server wallet (address is public, key is PRIVATE):**
 

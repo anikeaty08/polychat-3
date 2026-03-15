@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store';
-import { ArrowLeft, MessageCircle, UserPlus, Shield, AlertTriangle, Copy, QrCode } from 'lucide-react';
+import { ArrowLeft, MessageCircle, UserPlus, Shield, AlertTriangle, Copy, QrCode, Circle, Lock, Wallet } from 'lucide-react';
 import { formatAddress, formatTime, formatLastSeen } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import Image from 'next/image';
@@ -177,40 +177,63 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-600 dark:text-gray-400">Loading...</div>
+      <div className="flex items-center justify-center h-screen mesh-bg">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-full border-4 border-violet-500 border-t-transparent animate-spin mx-auto mb-3" />
+          <div className="text-gray-600 dark:text-gray-400 font-medium">Loading profile…</div>
+        </div>
       </div>
     );
   }
 
   if (!profile) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-600 dark:text-gray-400">Profile not found</div>
+      <div className="flex items-center justify-center h-screen mesh-bg">
+        <div className="glass-card rounded-3xl p-8 text-center">
+          <div className="text-gray-900 dark:text-white font-bold text-lg">Profile not found</div>
+          <button
+            onClick={() => router.back()}
+            className="mt-4 px-4 py-2 rounded-2xl bg-white/60 dark:bg-gray-900/40 hover:bg-white/80 dark:hover:bg-gray-900/60 text-gray-900 dark:text-white font-semibold transition-all active:scale-95"
+          >
+            Go back
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center space-x-3 p-4">
+    <div className="min-h-screen mesh-bg">
+      <div className="glass-card border-b border-gray-200/30 dark:border-gray-700/30 sticky top-0 z-10">
+        <div className="flex items-center justify-between p-4 max-w-2xl mx-auto">
+          <div className="flex items-center space-x-3">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+            className="p-2.5 hover:bg-gray-100/80 dark:hover:bg-gray-700/80 rounded-xl transition-all active:scale-95"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
           </button>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">
             {isOwn ? 'My Profile' : 'Profile'}
           </h1>
+          </div>
+          {!isOwn && profile?.wallet_address && (
+            <button
+              onClick={() => router.push(`/payments?to=${profile.wallet_address}`)}
+              className="px-3 py-2 rounded-xl bg-white/60 dark:bg-gray-900/40 hover:bg-white/80 dark:hover:bg-gray-900/60 text-gray-900 dark:text-white text-sm font-semibold transition-all active:scale-95 inline-flex items-center gap-2"
+              title="Pay"
+            >
+              <Wallet className="w-4 h-4" />
+              <span className="hidden sm:inline">Pay</span>
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-4 max-w-2xl mx-auto">
         {/* Profile Picture */}
         <div className="flex justify-center mb-6">
-          <div className="relative w-32 h-32 rounded-full bg-gray-300 dark:bg-gray-600 overflow-hidden">
+          <div className="relative w-32 h-32 rounded-3xl bg-gradient-to-br from-violet-400 to-purple-600 overflow-hidden shadow-2xl shadow-violet-500/20 border border-white/20">
             {profile.profile_picture ? (
               <Image
                 src={profile.profile_picture}
@@ -220,7 +243,7 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <span className="text-gray-600 dark:text-gray-400 text-4xl">
+                <span className="text-white text-4xl font-extrabold">
                   {profile.username?.[0]?.toUpperCase() || 'U'}
                 </span>
               </div>
@@ -235,25 +258,31 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
           </h2>
           <p className="text-gray-600 dark:text-gray-400">@{profile.username || 'no_username'}</p>
           {profile.is_online ? (
-            <p className="text-sm text-green-600 dark:text-green-400 mt-2">🟢 Online</p>
+            <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-2 inline-flex items-center gap-2 justify-center">
+              <Circle className="w-3 h-3 fill-current" />
+              <span>Online</span>
+            </p>
           ) : profile.last_seen ? (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
               Last seen {formatLastSeen(profile.last_seen)}
             </p>
           ) : (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">⚫ Offline</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 inline-flex items-center gap-2 justify-center">
+              <Circle className="w-3 h-3 fill-current opacity-50" />
+              <span>Offline</span>
+            </p>
           )}
         </div>
 
         {/* Status */}
         {profile.status && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4">
+          <div className="glass-card rounded-3xl p-4 mb-4">
             <p className="text-gray-700 dark:text-gray-300">{profile.status}</p>
           </div>
         )}
 
         {/* Wallet Address */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4">
+        <div className="glass-card rounded-3xl p-4 mb-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Wallet Address</p>
@@ -263,7 +292,8 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
             </div>
             <button
               onClick={handleCopyAddress}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+              className="p-2.5 hover:bg-gray-100/80 dark:hover:bg-gray-700/80 rounded-xl transition-all active:scale-95"
+              title="Copy address"
             >
               <Copy className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             </button>
@@ -272,7 +302,7 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
 
         {/* Join Date */}
         {profile.created_at && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4">
+          <div className="glass-card rounded-3xl p-4 mb-4">
             <p className="text-sm text-gray-500 dark:text-gray-400">Joined</p>
             <p className="text-sm text-gray-900 dark:text-white">
               {new Date(profile.created_at).toLocaleDateString()}
@@ -281,11 +311,14 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
         )}
 
         {/* Encryption & On-chain Badges */}
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4 space-y-2">
+        <div className="glass-card border border-emerald-200/40 dark:border-emerald-900/40 rounded-3xl p-4 mb-4 space-y-2">
           <div className="flex items-center space-x-2">
             <Shield className="w-5 h-5 text-green-600 dark:text-green-400" />
             <p className="text-sm text-green-900 dark:text-green-100">
-              🔐 E2E Encrypted Connection
+              <span className="inline-flex items-center gap-2">
+                <Lock className="w-4 h-4" />
+                <span>E2E Encrypted Connection</span>
+              </span>
             </p>
           </div>
           <OnChainCoreStatus compact />
@@ -296,7 +329,7 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
           <div className="space-y-3">
             <button
               onClick={handleStartChat}
-              className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center space-x-2"
+              className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-2xl flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transition-all active:scale-95"
             >
               <MessageCircle className="w-5 h-5" />
               <span>Message</span>
@@ -304,14 +337,14 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
             <div className="grid grid-cols-2 gap-3">
               <button 
                 onClick={handleAddContact}
-                className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center space-x-2"
+                className="bg-white/60 dark:bg-gray-900/40 hover:bg-white/80 dark:hover:bg-gray-900/60 text-gray-900 dark:text-white font-semibold py-3 px-6 rounded-2xl flex items-center justify-center space-x-2 transition-all active:scale-95"
               >
                 <UserPlus className="w-5 h-5" />
                 <span>Add Contact</span>
               </button>
               <button 
                 onClick={handleBlock}
-                className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center space-x-2"
+                className="bg-white/60 dark:bg-gray-900/40 hover:bg-red-50/80 dark:hover:bg-red-900/20 text-gray-900 dark:text-white font-semibold py-3 px-6 rounded-2xl flex items-center justify-center space-x-2 transition-all active:scale-95"
               >
                 <Shield className="w-5 h-5" />
                 <span>Block</span>
@@ -319,7 +352,7 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
             </div>
             <button 
               onClick={handleReport}
-              className="w-full bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 font-semibold py-3 px-6 rounded-lg flex items-center justify-center space-x-2"
+              className="w-full bg-red-50/80 dark:bg-red-900/20 hover:bg-red-100/80 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 font-semibold py-3 px-6 rounded-2xl flex items-center justify-center space-x-2 transition-all active:scale-95"
             >
               <AlertTriangle className="w-5 h-5" />
               <span>Report</span>
@@ -330,7 +363,7 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
         {isOwn && (
           <button
             onClick={() => router.push('/settings')}
-            className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-6 rounded-lg"
+            className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95"
           >
             Go to Settings
           </button>

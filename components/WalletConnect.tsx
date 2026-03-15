@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store';
-import { generateChallenge, verifyWalletSignature } from '@/lib/auth';
 import { formatAddress } from '@/lib/polygon';
 import { Wallet, ArrowLeft, CheckCircle2, X, MessageCircle, Phone, Shield, Lock, Zap, Globe, Mic, Image as ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
+import EthereumProvider from '@walletconnect/ethereum-provider';
 
 declare global {
   interface Window {
@@ -23,15 +23,23 @@ export default function WalletConnect() {
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [signing, setSigning] = useState(false);
+  const [connector, setConnector] = useState<'metamask' | 'walletconnect'>('metamask');
+  const [wcProvider, setWcProvider] = useState<any>(null);
 
   useEffect(() => {
     checkConnection();
   }, []);
 
+  const getEip1193Provider = () => {
+    if (connector === 'walletconnect') return wcProvider;
+    return typeof window !== 'undefined' ? (window as any).ethereum : null;
+  };
+
   const checkConnection = async () => {
-    if (typeof window.ethereum !== 'undefined') {
+    const provider = getEip1193Provider();
+    if (provider) {
       try {
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        const accounts = await provider.request({ method: 'eth_accounts' });
         if (accounts.length > 0) {
           setAddress(accounts[0]);
           setConnected(true);
@@ -49,6 +57,7 @@ export default function WalletConnect() {
     }
 
     try {
+      setConnector('metamask');
       setLoading(true);
       const provider = new ethers.BrowserProvider(window.ethereum);
       
@@ -68,12 +77,51 @@ export default function WalletConnect() {
     }
   };
 
+  const connectWalletConnect = async () => {
+    const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+    if (!projectId) {
+      toast.error('WalletConnect not configured (missing NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID)');
+      return;
+    }
+
+    try {
+      setConnector('walletconnect');
+      setLoading(true);
+
+      const provider = await EthereumProvider.init({
+        projectId,
+        chains: [137, 80002],
+        showQrModal: true,
+        optionalChains: [137, 80002],
+      });
+
+      await provider.connect();
+      setWcProvider(provider);
+
+      const accounts = (await provider.request({ method: 'eth_accounts' })) as string[];
+      if (!accounts?.length) throw new Error('No account returned');
+
+      setAddress(accounts[0]);
+      setConnected(true);
+      toast.success('Wallet connected!');
+    } catch (error: any) {
+      console.error('WalletConnect error:', error);
+      toast.error(error?.message || 'Failed to connect wallet');
+      setConnector('metamask');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const signMessage = async () => {
     if (!address) return;
 
     try {
       setSigning(true);
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      const eip1193 = getEip1193Provider();
+      if (!eip1193) throw new Error('No wallet provider');
+
+      const provider = new ethers.BrowserProvider(eip1193);
       const signer = await provider.getSigner();
 
       // Get challenge from server
@@ -152,6 +200,13 @@ export default function WalletConnect() {
   };
 
   const disconnect = () => {
+    try {
+      if (connector === 'walletconnect' && wcProvider?.disconnect) {
+        wcProvider.disconnect();
+      }
+    } catch {
+      // ignore
+    }
     setAddress('');
     setConnected(false);
   };
@@ -287,6 +342,15 @@ export default function WalletConnect() {
                 >
                   <Wallet className="w-5 h-5" />
                   <span>{loading ? 'Connecting...' : 'Connect MetaMask'}</span>
+                </button>
+
+                <button
+                  onClick={connectWalletConnect}
+                  disabled={loading}
+                  className="w-full flex items-center justify-center space-x-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-2xl transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
+                >
+                  <Globe className="w-5 h-5" />
+                  <span>{loading ? 'Connecting...' : 'Connect WalletConnect'}</span>
                 </button>
 
                 <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
