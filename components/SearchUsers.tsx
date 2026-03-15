@@ -98,7 +98,7 @@ export default function SearchUsers() {
                 setQuery(v);
                 handleSearch(v);
               }}
-              className="w-full pl-12 pr-4 py-3 bg-gray-100/80 dark:bg-gray-800/80 rounded-2xl text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:bg-white dark:focus:bg-gray-900 transition-all"
+              className="w-full pl-12 pr-4 py-3 bg-gray-100/80 dark:bg-gray-800/80 rounded-2xl text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-gray-900 transition-all"
             />
           </div>
         </div>
@@ -110,15 +110,15 @@ export default function SearchUsers() {
             <h3 className="text-base font-bold text-gray-900 dark:text-white mb-3">Search Tips</h3>
             <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
               <p className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 @username (e.g., @alice_123)
               </p>
               <p className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 Wallet address (0x...)
               </p>
               <p className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 ENS name (alice.eth) if supported
               </p>
             </div>
@@ -126,10 +126,10 @@ export default function SearchUsers() {
         )}
 
         {loading && (
-          <div className="text-center py-10">
-            <div className="inline-block w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
+            <div className="text-center py-10">
+              <div className="inline-block w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
 
         {query && !loading && (
           <div>
@@ -147,7 +147,7 @@ export default function SearchUsers() {
                 {results.map((result) => (
                   <div key={result.id} className="glass-card rounded-3xl p-4 hover:shadow-xl transition-all">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-400 to-purple-600 flex-shrink-0 overflow-hidden shadow-lg shadow-violet-500/20">
+                      <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex-shrink-0 overflow-hidden shadow-lg shadow-emerald-500/20">
                         {result.profile_picture ? (
                           <Image src={result.profile_picture} alt={result.username || 'User'} fill className="object-cover" />
                         ) : (
@@ -174,7 +174,7 @@ export default function SearchUsers() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleStartChat(result.id)}
-                        className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white py-2.5 px-4 rounded-2xl text-sm font-semibold shadow-lg hover:shadow-xl transition-all active:scale-95"
+                        className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-2.5 px-4 rounded-2xl text-sm font-semibold shadow-lg hover:shadow-xl transition-all active:scale-95"
                       >
                         <MessageCircle className="w-4 h-4" />
                         <span>Message</span>
@@ -197,4 +197,3 @@ export default function SearchUsers() {
     </div>
   );
 }
-

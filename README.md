@@ -163,7 +163,7 @@ npm run dev
 **Optional ERC-20 token addresses (for direct token payments):**
 
 - `NEXT_PUBLIC_POLYGON_NATIVE_SYMBOL` (default `POL`)
-- `NEXT_PUBLIC_AMOY_NATIVE_SYMBOL` (default `MATIC`)
+- `NEXT_PUBLIC_AMOY_NATIVE_SYMBOL` (default `POL`)
 - `NEXT_PUBLIC_POLYGON_TOKEN_USDC_ADDRESS` (optional override)
 - `NEXT_PUBLIC_POLYGON_TOKEN_USDT_ADDRESS` (optional override)
 - `NEXT_PUBLIC_POLYGON_TOKEN_DAI_ADDRESS` (optional override)
@@ -171,9 +171,20 @@ npm run dev
 - `NEXT_PUBLIC_AMOY_TOKEN_USDT_ADDRESS`
 - `NEXT_PUBLIC_AMOY_TOKEN_DAI_ADDRESS`
 
+Notes:
+- Polygon **mainnet** USDC/USDT/DAI addresses are built-in defaults in `lib/tokens.ts`. You only need the env vars if you want to override them.
+- To get any token address, use the token's contract address from the network's block explorer (e.g. Polygonscan / Amoy Polygonscan).
+- Backward-compatible env var names are also supported: `NEXT_PUBLIC_TOKEN_USDC_ADDRESS`, `NEXT_PUBLIC_TOKEN_USDT_ADDRESS`, `NEXT_PUBLIC_TOKEN_DAI_ADDRESS`.
+
 **WalletConnect (mobile support):**
 
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
+
+**WebRTC TURN (recommended for reliable calls outside LAN):**
+
+- `NEXT_PUBLIC_TURN_URLS` (comma-separated)
+- `NEXT_PUBLIC_TURN_USERNAME`
+- `NEXT_PUBLIC_TURN_CREDENTIAL`
 
 **Server wallet (address is public, key is PRIVATE):**
 

@@ -40,6 +40,8 @@ export async function GET(req: NextRequest) {
       return {
         ...call,
         id: String(call._id),
+        conversation_id: call.conversation_id ? String(call.conversation_id) : null,
+        conversationId: call.conversation_id ? String(call.conversation_id) : null,
         contact: contact
           ? {
               id: String(contact._id),

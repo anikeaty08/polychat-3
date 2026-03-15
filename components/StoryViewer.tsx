@@ -138,7 +138,7 @@ export default function StoryViewer({ stories, initialIndex, onClose, onView }: 
                 className="object-cover"
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+              <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
                 <span className="text-white font-bold">
                   {currentUser?.username?.[0]?.toUpperCase() || currentUser?.display_name?.[0]?.toUpperCase() || 'U'}
                 </span>

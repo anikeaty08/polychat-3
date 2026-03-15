@@ -50,6 +50,8 @@ export default function CallModal({
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const callTimerRef = useRef<NodeJS.Timeout | null>(null);
   const outgoingStartedRef = useRef(false);
+  const calleeStartedRef = useRef(false);
+  const acceptedIncomingRef = useRef(false);
 
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
@@ -62,11 +64,27 @@ export default function CallModal({
 
   const rtcConfig: RTCConfiguration = useMemo(
     () => ({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-      ],
+      iceServers: (() => {
+        const servers: RTCIceServer[] = [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+        ];
+
+        const urls = (process.env.NEXT_PUBLIC_TURN_URLS || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (urls.length) {
+          servers.unshift({
+            urls,
+            username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+            credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
+          });
+        }
+
+        return servers;
+      })(),
       iceCandidatePoolSize: 10,
     }),
     []
@@ -88,6 +106,8 @@ export default function CallModal({
       clearInterval(callTimerRef.current);
       callTimerRef.current = null;
     }
+
+    toast.dismiss('call-connect');
 
     try {
       peerConnectionRef.current?.getSenders().forEach((s) => {
@@ -114,6 +134,8 @@ export default function CallModal({
     setIsMuted(false);
     setIsVideoOff(false);
     outgoingStartedRef.current = false;
+    calleeStartedRef.current = false;
+    acceptedIncomingRef.current = false;
 
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
@@ -144,6 +166,7 @@ export default function CallModal({
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'connected') {
         setIsConnected(true);
+        toast.dismiss('call-connect');
         if (!callTimerRef.current) {
           callTimerRef.current = setInterval(() => setCallDuration((s) => s + 1), 1000);
         }
@@ -156,6 +179,7 @@ export default function CallModal({
     pc.oniceconnectionstatechange = () => {
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
         setIsConnected(true);
+        toast.dismiss('call-connect');
         if (!callTimerRef.current) {
           callTimerRef.current = setInterval(() => setCallDuration((s) => s + 1), 1000);
         }
@@ -221,12 +245,13 @@ export default function CallModal({
     }
   }, [socket, callId, remoteUserId, getMediaStream, ensurePeerConnection, callType, onEnd]);
 
-  const startAsCallee = useCallback(async () => {
+  const startAsCallee = useCallback(async (offerOverride?: RTCSessionDescriptionInit | null) => {
     if (!socket || !callId || !remoteUserId) return;
-    if (!pendingOffer) {
-      toast.error('Still connecting… please wait a moment and try again.');
-      return;
-    }
+
+    const offerToUse = offerOverride || pendingOffer;
+    if (!offerToUse) return;
+    if (calleeStartedRef.current) return;
+    calleeStartedRef.current = true;
 
     try {
       const stream = await getMediaStream();
@@ -234,7 +259,7 @@ export default function CallModal({
 
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
-      await pc.setRemoteDescription(new RTCSessionDescription(pendingOffer));
+      await pc.setRemoteDescription(new RTCSessionDescription(offerToUse));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
@@ -245,6 +270,7 @@ export default function CallModal({
       });
     } catch (error: any) {
       console.error('Failed to accept call:', error);
+      calleeStartedRef.current = false;
       toast.error(error?.message || 'Unable to accept call.');
       onDecline();
     }
@@ -253,8 +279,13 @@ export default function CallModal({
   const handleAccept = async () => {
     try {
       onAccept();
-      await startAsCallee();
-      toast.success('Call accepted');
+      acceptedIncomingRef.current = true;
+      if (pendingOffer) {
+        await startAsCallee(pendingOffer);
+        toast.success('Call accepted');
+      } else {
+        toast.loading('Connecting…', { id: 'call-connect' });
+      }
     } catch (error: any) {
       console.error('Accept call error:', error);
       toast.error('Unable to accept call.');
@@ -313,7 +344,12 @@ export default function CallModal({
 
     const onOffer = (data: any) => {
       if (!data || data.callId !== callId) return;
-      setPendingOffer(data.offer || null);
+      const offer = data.offer || null;
+      setPendingOffer(offer);
+      if (offer && acceptedIncomingRef.current) {
+        toast.dismiss('call-connect');
+        startAsCallee(offer);
+      }
     };
 
     const onAnswer = async (data: any) => {
@@ -347,7 +383,7 @@ export default function CallModal({
       socket.off('webrtc_answer', onAnswer);
       socket.off('webrtc_ice_candidate', onCandidate);
     };
-  }, [socket, callId]);
+  }, [socket, callId, startAsCallee]);
 
   useEffect(() => {
     if (!isOpen) return;

@@ -12,7 +12,7 @@ export default function SplashScreen() {
       icon: MessageCircle,
       title: 'Secure Messaging',
       description: 'End-to-end encrypted messages',
-      color: 'from-violet-500 to-purple-600',
+      color: 'from-emerald-500 to-teal-600',
     },
     {
       icon: Phone,
@@ -42,7 +42,7 @@ export default function SplashScreen() {
       icon: EyeOff,
       title: 'Anonymous Mode',
       description: 'Chat without revealing identity',
-      color: 'from-indigo-500 to-violet-600',
+      color: 'from-teal-500 to-cyan-600',
     },
   ];
 
@@ -58,7 +58,7 @@ export default function SplashScreen() {
             scale: [1, 1.1, 1],
           }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-20 right-20 w-72 h-72 bg-gradient-to-br from-violet-500/20 to-purple-600/20 rounded-full blur-3xl"
+          className="absolute top-20 right-20 w-72 h-72 bg-gradient-to-br from-emerald-500/20 to-teal-600/20 rounded-full blur-3xl"
         />
         <motion.div 
           animate={{ 
@@ -103,10 +103,10 @@ export default function SplashScreen() {
               <motion.div 
                 animate={{ rotate: 360 }}
                 transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-0 rounded-full border-2 border-dashed border-violet-400/30"
+                className="absolute inset-0 rounded-full border-2 border-dashed border-emerald-400/30"
               />
               {/* Inner Glow */}
-              <div className="absolute inset-2 rounded-full bg-gradient-to-br from-violet-500 via-purple-600 to-fuchsia-500 shadow-lg shadow-violet-500/50 animate-glow" />
+              <div className="absolute inset-2 rounded-full bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-500 shadow-lg shadow-emerald-500/50 animate-glow" />
               {/* Icon */}
               <div className="absolute inset-2 rounded-full flex items-center justify-center">
                 <MessageCircle className="w-12 h-12 text-white drop-shadow-lg" />
@@ -157,7 +157,7 @@ export default function SplashScreen() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ delay: 0.4 + index * 0.08 }}
                 whileHover={{ scale: 1.05, y: -2 }}
-                className="group relative p-4 rounded-2xl bg-white/50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/50 cursor-pointer overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-violet-300/50 dark:hover:border-violet-600/50"
+                className="group relative p-4 rounded-2xl bg-white/50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/50 cursor-pointer overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-emerald-300/50 dark:hover:border-emerald-600/50"
               >
                 {/* Gradient Overlay on Hover */}
                 <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
@@ -184,7 +184,7 @@ export default function SplashScreen() {
               whileHover={{ scale: 1.02, y: -2 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => router.push('/auth/wallet')}
-              className="w-full relative group overflow-hidden bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-lg shadow-violet-500/30 hover:shadow-xl hover:shadow-violet-500/40"
+              className="w-full relative group overflow-hidden bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40"
             >
               {/* Button Shine Effect */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
@@ -199,7 +199,7 @@ export default function SplashScreen() {
               animate={{ opacity: 1 }}
               transition={{ delay: 1 }}
               onClick={() => router.push('/auth/wallet')}
-              className="w-full text-violet-600 dark:text-violet-400 font-medium py-3 hover:text-violet-700 dark:hover:text-violet-300 transition-colors flex items-center justify-center gap-2"
+              className="w-full text-emerald-700 dark:text-emerald-400 font-medium py-3 hover:text-emerald-800 dark:hover:text-emerald-300 transition-colors flex items-center justify-center gap-2"
             >
               <Fingerprint className="w-4 h-4" />
               Already have an account?

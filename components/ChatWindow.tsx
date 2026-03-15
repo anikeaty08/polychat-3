@@ -48,6 +48,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [showEncryptionBadge, setShowEncryptionBadge] = useState(true);
+  const autoCallStartedRef = useRef(false);
 
   useEffect(() => {
     if (!user || !token) {
@@ -1372,12 +1373,36 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     }
   };
 
+  // Auto-start call when navigated from Calls screen (e.g. /chats/:id?call=audio)
+  useEffect(() => {
+    if (autoCallStartedRef.current) return;
+    if (typeof window === 'undefined') return;
+    if (!participant || isBlocked) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const call = params.get('call');
+    if (call !== 'audio' && call !== 'video') return;
+
+    autoCallStartedRef.current = true;
+
+    // Best-effort remove query param so it doesn't retrigger on re-render.
+    try {
+      window.history.replaceState(null, '', window.location.pathname);
+    } catch {
+      // ignore
+    }
+
+    if (call === 'video') handleVideoCall();
+    else handleAudioCall();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [participant, isBlocked]);
+
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen mesh-bg">
         <div className="text-center">
-          <div className="w-16 h-16 rounded-full border-4 border-violet-500 border-t-transparent animate-spin mx-auto mb-4" />
+          <div className="w-16 h-16 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin mx-auto mb-4" />
           <p className="text-gray-600 dark:text-gray-400 font-medium">Loading chat...</p>
         </div>
       </div>
@@ -1399,7 +1424,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
             onClick={() => participant?.id && router.push(`/profile/${participant.id}`)}
             className="flex items-center space-x-3 flex-1 min-w-0"
           >
-            <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-400 to-purple-600 flex-shrink-0 overflow-hidden shadow-lg shadow-violet-500/20">
+            <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex-shrink-0 overflow-hidden shadow-lg shadow-emerald-500/20">
               {participant?.profile_picture && participant.profile_picture !== null ? (
                 <Image
                   src={participant.profile_picture}
@@ -1543,7 +1568,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
       {/* Selection Mode Bar */}
       {isSelectMode && (
-        <div className="bg-gradient-to-r from-violet-600 to-purple-600 text-white px-4 py-3 flex items-center justify-between shadow-lg animate-slide-in-down">
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-4 py-3 flex items-center justify-between shadow-lg animate-slide-in-down">
           <span className="font-semibold">{selectedMessages.size} selected</span>
           <div className="flex items-center space-x-2">
             <button
@@ -1607,7 +1632,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                 className={`relative max-w-xs lg:max-w-md rounded-3xl overflow-hidden cursor-pointer transition-all duration-200 ${isOwn
                     ? 'message-own'
                     : 'message-other'
-                  } ${isSelected ? 'ring-2 ring-violet-500 ring-offset-2 scale-[1.02]' : ''
+                  } ${isSelected ? 'ring-2 ring-emerald-500 ring-offset-2 scale-[1.02]' : ''
                   } hover:shadow-lg`}
               >
                 {isImage && (
@@ -1840,7 +1865,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
             type="button"
             onClick={handleCameraCapture}
             disabled={uploading || isBlocked || isRecording}
-            className="p-3 bg-gradient-to-br from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white rounded-2xl disabled:opacity-50 transition-all shadow-lg hover:shadow-xl active:scale-95 camera-btn"
+            className="p-3 bg-gradient-to-br from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl disabled:opacity-50 transition-all shadow-lg hover:shadow-xl active:scale-95 camera-btn"
             title="Take photo"
           >
             <Camera className="w-5 h-5" />
@@ -1899,7 +1924,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
             onChange={(e) => setMessage(e.target.value)}
             placeholder={isBlocked ? "You have blocked this user" : isRecording ? "Recording voice message..." : "Type a message..."}
             disabled={isBlocked || isRecording}
-            className="flex-1 px-5 py-3 bg-gray-100/80 dark:bg-gray-800/80 rounded-2xl text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:bg-white dark:focus:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="flex-1 px-5 py-3 bg-gray-100/80 dark:bg-gray-800/80 rounded-2xl text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           />
 
           {!isRecording && <EmojiPicker onSelect={handleEmojiSelect} />}
@@ -1908,7 +1933,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
             <button
               type="submit"
               disabled={!message.trim() || uploading || isBlocked}
-              className="p-3.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl active:scale-95 disabled:hover:scale-100"
+              className="p-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl active:scale-95 disabled:hover:scale-100"
             >
               <Send className="w-5 h-5" />
             </button>
@@ -1916,7 +1941,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
         </form>
         {uploading && !isRecording && (
           <div className="flex items-center justify-center mt-3 text-sm text-gray-500 dark:text-gray-400">
-            <div className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mr-2" />
+            <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mr-2" />
             Uploading...
           </div>
         )}

@@ -37,6 +37,18 @@ function verifyToken(token) {
   }
 }
 
+// Prevent unbounded growth if calls are abandoned mid-signalling.
+setInterval(() => {
+  const now = Date.now();
+  for (const [callId, entry] of offersByCallId.entries()) {
+    if (!entry || !entry.ts) {
+      offersByCallId.delete(callId);
+      continue;
+    }
+    if (now - entry.ts > 2 * 60 * 1000) offersByCallId.delete(callId);
+  }
+}, 60 * 1000).unref?.();
+
 io.use((socket, next) => {
   const token = socket.handshake.auth && socket.handshake.auth.token;
   const payload = verifyToken(token);

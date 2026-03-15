@@ -291,8 +291,8 @@ export default function StatusTab() {
               onClick={() => myStatus ? handleStoryClick('me') : setShowCreateModal(true)}
               className="relative group"
             >
-              <div className={`relative w-20 h-20 rounded-full overflow-hidden border-4 ${myStatus
-                  ? 'border-violet-500 dark:border-violet-400'
+                <div className={`relative w-20 h-20 rounded-full overflow-hidden border-4 ${myStatus
+                  ? 'border-emerald-500 dark:border-emerald-400'
                   : 'border-gray-300 dark:border-gray-600 border-dashed'
                 } transition-all hover:scale-105`}>
                 {myStatus ? (
@@ -305,13 +305,13 @@ export default function StatusTab() {
                         className="object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                      <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
                         <span className="text-white font-bold text-xl">
                           {(user as any)?.username?.[0]?.toUpperCase() || (user as any)?.walletAddress?.[2]?.toUpperCase() || 'U'}
                         </span>
                       </div>
                     )}
-                    <div className="absolute bottom-0 right-0 w-6 h-6 bg-violet-500 dark:bg-violet-400 rounded-full border-2 border-white dark:border-gray-900 flex items-center justify-center">
+                    <div className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 dark:bg-emerald-400 rounded-full border-2 border-white dark:border-gray-900 flex items-center justify-center">
                       <Plus className="w-4 h-4 text-white" />
                     </div>
                   </>
@@ -341,7 +341,7 @@ export default function StatusTab() {
                     className="relative group"
                   >
                     <div className={`relative w-20 h-20 rounded-full overflow-hidden border-4 transition-all hover:scale-105 ${hasUnviewed
-                        ? 'border-violet-500 dark:border-violet-400'
+                        ? 'border-emerald-500 dark:border-emerald-400'
                         : 'border-gray-300 dark:border-gray-600'
                       }`}>
                       {storyUser?.profile_picture ? (
@@ -352,7 +352,7 @@ export default function StatusTab() {
                           className="object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                        <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
                           <span className="text-white font-bold text-xl">
                             {storyUser?.username?.[0]?.toUpperCase() || storyUser?.display_name?.[0]?.toUpperCase() || 'U'}
                           </span>

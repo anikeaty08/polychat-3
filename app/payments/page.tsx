@@ -3,10 +3,10 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store';
-import { getPaymentTokens, type PaymentToken } from '@/lib/tokens';
+import { getNativeToken, getPaymentTokens, type PaymentToken } from '@/lib/tokens';
 import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Coins, Copy, ExternalLink, ShieldCheck, Wallet } from 'lucide-react';
+import { ArrowLeft, Coins, Copy, ExternalLink, Plus, ShieldCheck, Wallet } from 'lucide-react';
 import NetworkSwitcher, { type SupportedChainId } from '@/components/NetworkSwitcher';
 
 const ERC20_ABI = [
@@ -28,7 +28,12 @@ function PaymentsInner() {
   const searchParams = useSearchParams();
   const { user, token } = useAuthStore();
 
-  const [selectedTokenKey, setSelectedTokenKey] = useState<string>('MATIC');
+  const tokenKey = (t: PaymentToken) => (t.kind === 'native' ? `native:${t.symbol}` : t.address.toLowerCase());
+
+  const [selectedTokenKey, setSelectedTokenKey] = useState<string>('');
+  const [customTokens, setCustomTokens] = useState<PaymentToken[]>([]);
+  const [customTokenAddress, setCustomTokenAddress] = useState('');
+  const [addingToken, setAddingToken] = useState(false);
 
   const [payments, setPayments] = useState<any[]>([]);
   const [recipientAddress, setRecipientAddress] = useState('');
@@ -40,17 +45,65 @@ function PaymentsInner() {
   const [chainId, setChainId] = useState<number | null>(null);
   const [preferredChainId, setPreferredChainId] = useState<SupportedChainId>(80002);
 
-  const tokens = useMemo(() => getPaymentTokens(chainId), [chainId]);
+  const baseTokens = useMemo(() => getPaymentTokens(chainId), [chainId]);
+
+  useEffect(() => {
+    const effective = chainId ?? preferredChainId;
+    try {
+      const raw = window.localStorage.getItem(`polychat-custom-tokens:${effective}`);
+      if (!raw) {
+        setCustomTokens([]);
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        setCustomTokens([]);
+        return;
+      }
+      const safe: PaymentToken[] = parsed
+        .filter((t) => t && t.kind === 'erc20' && typeof t.address === 'string' && ethers.isAddress(t.address))
+        .map((t) => ({
+          kind: 'erc20' as const,
+          symbol: String(t.symbol || 'TOKEN').slice(0, 12),
+          name: String(t.name || t.symbol || 'Token').slice(0, 48),
+          address: ethers.getAddress(t.address) as `0x${string}`,
+          decimals: typeof t.decimals === 'number' ? t.decimals : undefined,
+        }));
+      setCustomTokens(safe);
+    } catch {
+      setCustomTokens([]);
+    }
+  }, [chainId, preferredChainId]);
+
+  const tokens = useMemo(() => {
+    const merged: PaymentToken[] = [...baseTokens];
+    for (const t of customTokens) {
+      if (t.kind !== 'erc20') continue;
+      const exists = merged.some((m) => m.kind === 'erc20' && m.address.toLowerCase() === t.address.toLowerCase());
+      if (!exists) merged.push(t);
+    }
+    return merged;
+  }, [baseTokens, customTokens]);
 
   useEffect(() => {
     if (!tokens.length) return;
-    if (!tokens.some((t) => t.symbol === selectedTokenKey)) {
-      setSelectedTokenKey(tokens[0].symbol);
+    if (!selectedTokenKey) {
+      setSelectedTokenKey(tokenKey(tokens[0]));
+      return;
     }
+
+    // Back-compat: if query param provided a symbol, map it to the first matching token option.
+    const symbolMatch = tokens.find((t) => t.symbol === selectedTokenKey);
+    if (symbolMatch) {
+      setSelectedTokenKey(tokenKey(symbolMatch));
+      return;
+    }
+
+    if (!tokens.some((t) => tokenKey(t) === selectedTokenKey)) setSelectedTokenKey(tokenKey(tokens[0]));
   }, [tokens, selectedTokenKey]);
 
   const selectedToken: PaymentToken | undefined = useMemo(
-    () => tokens.find((t) => t.symbol === selectedTokenKey) || tokens[0],
+    () => tokens.find((t) => tokenKey(t) === selectedTokenKey) || tokens[0],
     [tokens, selectedTokenKey]
   );
 
@@ -110,6 +163,54 @@ function PaymentsInner() {
       }
     } catch (error) {
       console.error('Failed to refresh wallet state:', error);
+    }
+  };
+
+  const addCustomToken = async () => {
+    if (addingToken) return;
+    const provider = getProvider();
+    if (!provider) {
+      toast.error('Connect a wallet first');
+      return;
+    }
+
+    const effectiveChainId = chainId ?? preferredChainId;
+    const addr = customTokenAddress.trim();
+    if (!ethers.isAddress(addr)) {
+      toast.error('Enter a valid token address');
+      return;
+    }
+
+    try {
+      setAddingToken(true);
+      const checksummed = ethers.getAddress(addr) as `0x${string}`;
+      const exists = tokens.some((t) => t.kind === 'erc20' && t.address.toLowerCase() === checksummed.toLowerCase());
+      if (exists) {
+        toast.success('Token already added');
+        setCustomTokenAddress('');
+        return;
+      }
+
+      const c = new ethers.Contract(checksummed, ERC20_ABI, provider);
+      const [symbol, decimals] = await Promise.all([c.symbol(), c.decimals()]);
+      const tokenObj: PaymentToken = {
+        kind: 'erc20',
+        symbol: String(symbol || 'TOKEN').slice(0, 12),
+        name: String(symbol || 'Token').slice(0, 48),
+        address: checksummed,
+        decimals: Number(decimals),
+      };
+
+      const next = [...customTokens, tokenObj];
+      setCustomTokens(next);
+      window.localStorage.setItem(`polychat-custom-tokens:${effectiveChainId}`, JSON.stringify(next));
+      setCustomTokenAddress('');
+      toast.success(`Added ${tokenObj.symbol}`);
+    } catch (error: any) {
+      console.error('Add token error:', error);
+      toast.error(error?.message || 'Failed to add token');
+    } finally {
+      setAddingToken(false);
     }
   };
 
@@ -413,18 +514,48 @@ function PaymentsInner() {
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Token</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Token</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomTokenAddress('');
+                      setAddingToken(false);
+                    }}
+                    className="text-xs font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white inline-flex items-center gap-1"
+                    title="Add custom ERC-20 token"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add token
+                  </button>
+                </div>
                 <select
                   value={selectedTokenKey}
                   onChange={(e) => setSelectedTokenKey(e.target.value)}
                   className="w-full px-4 py-3 bg-gray-100/80 dark:bg-gray-800/80 rounded-2xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all"
                 >
                   {tokens.map((t) => (
-                    <option key={t.symbol} value={t.symbol}>
+                    <option key={tokenKey(t)} value={tokenKey(t)}>
                       {t.symbol} {t.kind === 'erc20' ? '• ERC-20' : '• Native'}
                     </option>
                   ))}
                 </select>
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    value={customTokenAddress}
+                    onChange={(e) => setCustomTokenAddress(e.target.value)}
+                    placeholder="Add ERC-20 token address (0x...)"
+                    className="flex-1 px-4 py-2.5 bg-gray-100/80 dark:bg-gray-800/80 rounded-2xl text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={addCustomToken}
+                    disabled={addingToken || !customTokenAddress.trim()}
+                    className="px-4 py-2.5 rounded-2xl bg-white/70 dark:bg-gray-900/40 hover:bg-white/90 dark:hover:bg-gray-900/60 text-gray-900 dark:text-white font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {addingToken ? 'Adding…' : 'Add'}
+                  </button>
+                </div>
                 {selectedToken?.kind === 'erc20' && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 font-mono">
                     {selectedToken.address.slice(0, 10)}…{selectedToken.address.slice(-8)}
@@ -503,7 +634,7 @@ function PaymentsInner() {
 
         {/* History */}
         <div className="glass-card rounded-3xl overflow-hidden">
-          <div className="px-6 py-5 bg-gradient-to-r from-violet-600/10 to-purple-600/10 dark:from-violet-600/20 dark:to-purple-600/10 border-b border-gray-200/30 dark:border-gray-700/30">
+          <div className="px-6 py-5 bg-gradient-to-r from-emerald-600/10 to-cyan-600/10 dark:from-emerald-600/20 dark:to-cyan-600/10 border-b border-gray-200/30 dark:border-gray-700/30">
             <p className="font-bold text-gray-900 dark:text-white">History</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">Last 50 payments</p>
           </div>
@@ -514,7 +645,7 @@ function PaymentsInner() {
             ) : (
               <div className="space-y-2">
                 {payments.map((p) => {
-                  const sym = p.token_symbol || process.env.NEXT_PUBLIC_NATIVE_SYMBOL || 'MATIC';
+                  const sym = p.token_symbol || getNativeToken(p.chain_id).symbol;
                   const isErc20 = !!p.token_address;
                   const dec =
                     sym === 'USDC' || sym === 'USDT' ? 6 : 18;

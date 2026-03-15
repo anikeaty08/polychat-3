@@ -179,7 +179,7 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
     return (
       <div className="flex items-center justify-center h-screen mesh-bg">
         <div className="text-center">
-          <div className="w-12 h-12 rounded-full border-4 border-violet-500 border-t-transparent animate-spin mx-auto mb-3" />
+          <div className="w-12 h-12 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin mx-auto mb-3" />
           <div className="text-gray-600 dark:text-gray-400 font-medium">Loading profile…</div>
         </div>
       </div>
@@ -233,7 +233,7 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
       <div className="p-4 max-w-2xl mx-auto">
         {/* Profile Picture */}
         <div className="flex justify-center mb-6">
-          <div className="relative w-32 h-32 rounded-3xl bg-gradient-to-br from-violet-400 to-purple-600 overflow-hidden shadow-2xl shadow-violet-500/20 border border-white/20">
+          <div className="relative w-32 h-32 rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 overflow-hidden shadow-2xl shadow-emerald-500/20 border border-white/20">
             {profile.profile_picture ? (
               <Image
                 src={profile.profile_picture}
@@ -329,7 +329,7 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
           <div className="space-y-3">
             <button
               onClick={handleStartChat}
-              className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-2xl flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transition-all active:scale-95"
+              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold py-3 px-6 rounded-2xl flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transition-all active:scale-95"
             >
               <MessageCircle className="w-5 h-5" />
               <span>Message</span>
@@ -363,7 +363,7 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
         {isOwn && (
           <button
             onClick={() => router.push('/settings')}
-            className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95"
+            className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold py-3 px-6 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95"
           >
             Go to Settings
           </button>

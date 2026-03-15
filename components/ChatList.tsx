@@ -165,7 +165,7 @@ export default function ChatList() {
       <div className="glass-card border-b border-gray-200/30 dark:border-gray-700/30">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
               <MessageCircle className="w-5 h-5 text-white" />
             </div>
             <h1 className="text-2xl font-bold gradient-text">
@@ -252,7 +252,7 @@ export default function ChatList() {
         {/* Search Bar */}
         <div className="px-4 pb-2">
           <div className="relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-600 transition-colors" />
             <input
               type="text"
               placeholder="Search conversations by name, username, or message..."
@@ -267,7 +267,7 @@ export default function ChatList() {
                   setSearchQuery('');
                 }
               }}
-              className="w-full pl-12 pr-10 py-3.5 bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:bg-white dark:focus:bg-gray-900 transition-all shadow-sm hover:shadow-md"
+              className="w-full pl-12 pr-10 py-3.5 bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-gray-900 transition-all shadow-sm hover:shadow-md"
             />
             {searchQuery && (
               <button
@@ -295,7 +295,7 @@ export default function ChatList() {
           <button
             onClick={() => setActiveTab('chats')}
             className={`flex-1 py-4 text-center font-semibold transition-all duration-300 relative ${activeTab === 'chats'
-                ? 'text-violet-600 dark:text-violet-400'
+                ? 'text-emerald-700 dark:text-emerald-400'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
           >
@@ -304,13 +304,13 @@ export default function ChatList() {
               <span>Chats</span>
             </div>
             {activeTab === 'chats' && (
-              <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-gradient-to-r from-violet-600 to-purple-500 rounded-t-full" />
+              <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-gradient-to-r from-emerald-600 to-teal-500 rounded-t-full" />
             )}
           </button>
           <button
             onClick={() => setActiveTab('status')}
             className={`flex-1 py-4 text-center font-semibold transition-all duration-300 relative ${activeTab === 'status'
-                ? 'text-violet-600 dark:text-violet-400'
+                ? 'text-emerald-700 dark:text-emerald-400'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
           >
@@ -319,7 +319,7 @@ export default function ChatList() {
               <span>Status</span>
             </div>
             {activeTab === 'status' && (
-              <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-gradient-to-r from-violet-600 to-purple-500 rounded-t-full" />
+              <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-gradient-to-r from-emerald-600 to-teal-500 rounded-t-full" />
             )}
           </button>
           <button
@@ -328,7 +328,7 @@ export default function ChatList() {
               router.push('/calls');
             }}
             className={`flex-1 py-4 text-center font-semibold transition-all duration-300 relative ${activeTab === 'calls'
-                ? 'text-violet-600 dark:text-violet-400'
+                ? 'text-emerald-700 dark:text-emerald-400'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
           >
@@ -337,7 +337,7 @@ export default function ChatList() {
               <span>Calls</span>
             </div>
             {activeTab === 'calls' && (
-              <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-gradient-to-r from-violet-600 to-purple-500 rounded-t-full" />
+              <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-gradient-to-r from-emerald-600 to-teal-500 rounded-t-full" />
             )}
           </button>
         </div>
@@ -350,8 +350,8 @@ export default function ChatList() {
         ) : activeTab === 'chats' ? (
           filteredConversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
-              <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-violet-500/20 to-purple-600/20 flex items-center justify-center mb-6">
-                <MessageCircle className="w-12 h-12 text-violet-500" />
+              <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-emerald-500/20 to-teal-600/20 flex items-center justify-center mb-6">
+                <MessageCircle className="w-12 h-12 text-emerald-600" />
               </div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                 {searchQuery ? 'No conversations found' : 'No conversations yet'}
@@ -364,7 +364,7 @@ export default function ChatList() {
               {!searchQuery && (
                 <button
                   onClick={() => router.push('/search')}
-                  className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-semibold py-3 px-8 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95"
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold py-3 px-8 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95"
                 >
                   Start New Chat
                 </button>
@@ -384,7 +384,7 @@ export default function ChatList() {
                   className="flex items-center space-x-4 p-4 mx-2 my-1 hover:bg-white/50 dark:hover:bg-gray-800/50 cursor-pointer transition-all duration-200 rounded-2xl group animate-slide-up"
                   style={{ animationDelay: `${index * 0.05}s` }}
                 >
-                  <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-400 to-purple-600 flex-shrink-0 overflow-hidden shadow-lg shadow-violet-500/20 group-hover:shadow-violet-500/30 transition-all group-hover:scale-105">
+                  <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex-shrink-0 overflow-hidden shadow-lg shadow-emerald-500/20 group-hover:shadow-emerald-500/30 transition-all group-hover:scale-105">
                     {conversation.participant?.profile_picture && conversation.participant.profile_picture !== null ? (
                       <Image
                         src={conversation.participant.profile_picture}
@@ -441,7 +441,7 @@ export default function ChatList() {
                         )}
                       </p>
                       {conversation.unread_count > 0 && (
-                        <span className="flex-shrink-0 bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg animate-pulse">
+                        <span className="flex-shrink-0 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg animate-pulse">
                           {conversation.unread_count}
                         </span>
                       )}
@@ -457,7 +457,7 @@ export default function ChatList() {
       {/* Floating Action Button */}
       <button
         onClick={() => router.push('/search')}
-        className="fixed bottom-24 right-6 w-16 h-16 bg-gradient-to-br from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-2xl shadow-2xl shadow-violet-500/40 flex items-center justify-center z-10 transition-all duration-300 hover:scale-110 active:scale-95 group"
+        className="fixed bottom-24 right-6 w-16 h-16 bg-gradient-to-br from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl shadow-2xl shadow-emerald-500/40 flex items-center justify-center z-10 transition-all duration-300 hover:scale-110 active:scale-95 group"
       >
         <Plus className="w-7 h-7 group-hover:rotate-90 transition-transform duration-300" />
         <div className="absolute inset-0 rounded-2xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />

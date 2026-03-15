@@ -117,7 +117,7 @@ export default function BlockedUsers() {
                   className="glass-card rounded-3xl p-4 border border-gray-200/30 dark:border-gray-700/30"
                 >
                   <div className="flex items-center space-x-3 mb-3">
-                    <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-400 to-purple-600 flex-shrink-0 overflow-hidden shadow-lg shadow-violet-500/20">
+                    <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex-shrink-0 overflow-hidden shadow-lg shadow-emerald-500/20">
                       {blocked.user?.profile_picture ? (
                         <Image
                           src={blocked.user.profile_picture}
@@ -147,7 +147,7 @@ export default function BlockedUsers() {
                   </div>
                   <button
                     onClick={() => handleUnblock(blocked.user.id)}
-                    className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-semibold py-2.5 px-4 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95"
+                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold py-2.5 px-4 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95"
                   >
                     Unblock
                   </button>

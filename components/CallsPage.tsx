@@ -81,7 +81,7 @@ export default function CallsPage() {
     if (call.status === 'completed') {
       return 'from-emerald-500 to-teal-600';
     }
-    return 'from-violet-500 to-purple-600';
+    return 'from-emerald-500 to-teal-600';
   };
 
   if (!user) {
@@ -133,7 +133,7 @@ export default function CallsPage() {
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex-1 py-3.5 text-center text-sm font-medium relative transition-all ${
                 activeTab === tab.id
-                  ? 'text-violet-600 dark:text-violet-400'
+                  ? 'text-emerald-700 dark:text-emerald-400'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
@@ -142,7 +142,7 @@ export default function CallsPage() {
                 <span>{tab.label}</span>
               </div>
               {activeTab === tab.id && (
-                <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-gradient-to-r from-violet-600 to-purple-500 rounded-t-full" />
+                <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-gradient-to-r from-emerald-600 to-teal-500 rounded-t-full" />
               )}
             </button>
           ))}
@@ -152,7 +152,7 @@ export default function CallsPage() {
       <div className="p-4 max-w-2xl mx-auto">
         {loading ? (
           <div className="text-center py-16">
-            <div className="inline-block w-12 h-12 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mb-4" />
+            <div className="inline-block w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
             <p className="text-gray-600 dark:text-gray-400 font-medium">Loading calls...</p>
           </div>
         ) : calls.length === 0 ? (
@@ -195,7 +195,7 @@ export default function CallsPage() {
                           ? 'bg-red-500'
                           : call.status === 'completed'
                           ? 'bg-emerald-500'
-                          : 'bg-violet-500'
+                          : 'bg-emerald-500'
                       }`}>
                         {call.call_type === 'video' ? (
                           <Video className="w-3 h-3 text-white" />
@@ -257,8 +257,13 @@ export default function CallsPage() {
                     <button 
                       className="p-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl transition-all shadow-lg hover:shadow-xl active:scale-95"
                       onClick={() => {
-                        // TODO: Initiate call
-                        toast.success('Calling...');
+                        const convId = (call as any).conversationId || (call as any).conversation_id;
+                        if (!convId) {
+                          toast.error('Missing conversation for this call.');
+                          return;
+                        }
+                        const type = call.call_type === 'video' ? 'video' : 'audio';
+                        router.push(`/chats/${convId}?call=${type}`);
                       }}
                     >
                       <Phone className="w-5 h-5" />

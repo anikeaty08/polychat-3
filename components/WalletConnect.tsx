@@ -347,7 +347,7 @@ export default function WalletConnect() {
                 <button
                   onClick={connectWalletConnect}
                   disabled={loading}
-                  className="w-full flex items-center justify-center space-x-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-2xl transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
+                  className="w-full flex items-center justify-center space-x-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold py-4 px-6 rounded-2xl transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
                 >
                   <Globe className="w-5 h-5" />
                   <span>{loading ? 'Connecting...' : 'Connect WalletConnect'}</span>
