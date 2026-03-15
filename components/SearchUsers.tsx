@@ -76,7 +76,7 @@ export default function SearchUsers() {
   };
 
   return (
-    <div className="min-h-screen mesh-bg">
+    <div className="min-h-screen">
       <div className="glass-card border-b border-gray-200/30 dark:border-gray-700/30 sticky top-0 z-10">
         <div className="flex items-center gap-3 p-4 max-w-2xl mx-auto">
           <button

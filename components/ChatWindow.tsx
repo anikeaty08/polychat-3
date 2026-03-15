@@ -12,6 +12,7 @@ import CallModal from './CallModal';
 import EmojiPicker from './EmojiPicker';
 import { ethers } from 'ethers';
 import { getMessagingContract, getCallsContract, isOnChainEnabled } from '@/lib/contracts';
+import { getSocketUrl } from '@/lib/socket';
 
 interface ChatWindowProps {
   conversationId: string;
@@ -180,7 +181,10 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       socket.disconnect();
     }
 
-    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001', {
+    const socketUrl = getSocketUrl();
+    if (!socketUrl) return () => {};
+
+    const newSocket = io(socketUrl, {
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -1400,7 +1404,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen mesh-bg">
+      <div className="flex items-center justify-center h-[100dvh]">
         <div className="text-center">
           <div className="w-16 h-16 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin mx-auto mb-4" />
           <p className="text-gray-600 dark:text-gray-400 font-medium">Loading chat...</p>
@@ -1410,7 +1414,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   }
 
   return (
-    <div className="flex flex-col h-screen mesh-bg">
+    <div className="flex flex-col h-[100dvh]">
       {/* Header */}
       <div className="glass-card border-b border-gray-200/30 dark:border-gray-700/30 px-4 py-3 sticky top-0 z-20">
         <div className="flex items-center space-x-3">

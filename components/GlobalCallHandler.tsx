@@ -6,6 +6,7 @@ import { useAuthStore } from '@/lib/store';
 import { io, Socket } from 'socket.io-client';
 import CallModal from './CallModal';
 import toast from 'react-hot-toast';
+import { getSocketUrl } from '@/lib/socket';
 
 export default function GlobalCallHandler() {
   const router = useRouter();
@@ -27,7 +28,10 @@ export default function GlobalCallHandler() {
   useEffect(() => {
     if (!user || !token) return;
 
-    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001', {
+    const socketUrl = getSocketUrl();
+    if (!socketUrl) return;
+
+    const newSocket = io(socketUrl, {
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: true,

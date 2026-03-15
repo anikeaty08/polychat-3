@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from './providers';
 import { Toaster } from 'react-hot-toast';
+import AppFrame from '@/components/AppFrame';
 
 export const metadata: Metadata = {
   title: 'PolyChat',
@@ -17,7 +18,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body>
         <Providers>
-          {children}
+          <AppFrame>{children}</AppFrame>
           <Toaster 
             position="top-center"
             toastOptions={{

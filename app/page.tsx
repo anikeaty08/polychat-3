@@ -21,10 +21,8 @@ export default function HomePage() {
   }, [isAuthenticated, user, router]);
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="flex-1">
-        <SplashScreen />
-      </div>
+    <div className="py-4">
+      <SplashScreen />
       <div className="px-4 pb-6 flex justify-center">
         <OnChainCoreStatus compact />
       </div>

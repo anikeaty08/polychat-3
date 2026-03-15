@@ -145,7 +145,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen mesh-bg">
+    <div className="min-h-screen">
       {/* Header */}
       <div className="glass-card border-b border-gray-200/30 dark:border-gray-700/30 sticky top-0 z-10">
         <div className="flex items-center space-x-3 p-4">

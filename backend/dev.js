@@ -20,6 +20,6 @@ function run(command, args, name) {
 
 const nextCmd = process.platform === 'win32' ? 'node_modules\\.bin\\next.cmd' : 'node_modules/.bin/next';
 
-run('node', ['server/socket-server.js'], 'socket');
+run('node', ['backend/socket-server.js'], 'socket');
 run(nextCmd, ['dev'], 'next');
 

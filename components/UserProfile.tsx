@@ -177,7 +177,7 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen mesh-bg">
+      <div className="flex items-center justify-center h-[100dvh]">
         <div className="text-center">
           <div className="w-12 h-12 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin mx-auto mb-3" />
           <div className="text-gray-600 dark:text-gray-400 font-medium">Loading profile…</div>
@@ -188,7 +188,7 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
 
   if (!profile) {
     return (
-      <div className="flex items-center justify-center h-screen mesh-bg">
+      <div className="flex items-center justify-center h-[100dvh]">
         <div className="glass-card rounded-3xl p-8 text-center">
           <div className="text-gray-900 dark:text-white font-bold text-lg">Profile not found</div>
           <button
@@ -203,7 +203,7 @@ export default function UserProfile({ userId, isOwn = false }: UserProfileProps)
   }
 
   return (
-    <div className="min-h-screen mesh-bg">
+    <div className="min-h-screen">
       <div className="glass-card border-b border-gray-200/30 dark:border-gray-700/30 sticky top-0 z-10">
         <div className="flex items-center justify-between p-4 max-w-2xl mx-auto">
           <div className="flex items-center space-x-3">

@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "node server/dev.js",
+    "dev": "node backend/dev.js",
     "build": "next build",
-    "start": "node server/start.js",
+    "start": "node backend/start.js",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "socket": "node server/socket-server.js"
+    "socket": "node backend/socket-server.js"
   },
   "dependencies": {
     "@walletconnect/ethereum-provider": "^2.23.8",

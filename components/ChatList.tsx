@@ -9,6 +9,7 @@ import Image from 'next/image';
 import StatusTab from './StatusTab';
 import { io, Socket } from 'socket.io-client';
 import OnChainCoreStatus from '@/components/OnChainCoreStatus';
+import { getSocketUrl } from '@/lib/socket';
 
 export default function ChatList() {
   const router = useRouter();
@@ -34,8 +35,11 @@ export default function ChatList() {
 
     loadConversations();
 
+    const socketUrl = getSocketUrl();
+    if (!socketUrl) return;
+
     // Initialize socket for real-time updates
-    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001', {
+    const newSocket = io(socketUrl, {
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -160,7 +164,7 @@ export default function ChatList() {
   }
 
   return (
-    <div className="flex flex-col h-screen mesh-bg">
+    <div className="flex flex-col h-[100dvh]">
       {/* Header */}
       <div className="glass-card border-b border-gray-200/30 dark:border-gray-700/30">
         <div className="flex items-center justify-between p-4">

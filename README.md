@@ -135,7 +135,7 @@ cp env.txt .env
 npm run dev
 ```
 
-`npm run dev` starts both the Next.js app (default `http://localhost:3000`) and the Socket.io server (default `http://localhost:3001`).
+`npm run dev` starts both the Next.js app (default `http://localhost:3000`) and the Socket.io backend (default `http://localhost:3001`, in `backend/socket-server.js`).
 
 ### Environment Setup
 

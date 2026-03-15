@@ -189,7 +189,7 @@ export default function ProfileSetup() {
   };
 
   return (
-    <div className="min-h-screen mesh-bg p-4">
+    <div className="min-h-screen p-4">
       <div className="max-w-md mx-auto">
         <button
           onClick={() => router.push('/auth/wallet')}
