@@ -15,39 +15,24 @@ export default function WalletGuard({ children }: WalletGuardProps) {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    // Check if user is authenticated
     if (!user || !token) {
       router.push('/auth/wallet');
       return;
     }
 
-    // Check if wallet is connected
-    if (typeof window !== 'undefined' && window.ethereum) {
-      window.ethereum.request({ method: 'eth_accounts' })
-        .then((accounts: string[]) => {
-          if (accounts.length === 0) {
-            // No wallet connected
-            router.push('/auth/wallet');
-            return;
-          }
-          // Wallet is connected
-          setChecking(false);
-        })
-        .catch(() => {
-          router.push('/auth/wallet');
-        });
-    } else {
-      // No wallet extension found
-      router.push('/auth/wallet');
-    }
+    // A wallet may be connected via MetaMask extension OR WalletConnect (mobile),
+    // so don't hard-require `window.ethereum` here. Token presence is the gate.
+    setChecking(false);
   }, [user, token, router]);
 
   if (checking || !user || !token) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen mesh-bg flex items-center justify-center p-6">
         <div className="text-center">
-          <Wallet className="w-16 h-16 text-gray-400 mx-auto mb-4 animate-pulse" />
-          <p className="text-gray-600 dark:text-gray-400">Checking wallet connection...</p>
+          <div className="glass-card rounded-3xl p-8">
+            <Wallet className="w-16 h-16 text-violet-500 mx-auto mb-4 animate-pulse" />
+            <p className="text-gray-700 dark:text-gray-300 font-medium">Checking session…</p>
+          </div>
         </div>
       </div>
     );
